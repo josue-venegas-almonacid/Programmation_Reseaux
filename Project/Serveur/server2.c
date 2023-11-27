@@ -48,6 +48,10 @@ static void app(void)
 
    // The buffer for the messages
    char buffer[BUF_SIZE];
+   char command[BUF_SIZE];
+   char user_id[BUF_SIZE];
+   char message[BUF_SIZE];
+   char party_id[BUF_SIZE];
 
    // The number of clients
    int clients_size = 0;
@@ -137,6 +141,11 @@ static void app(void)
                /* client disconnected */
                if(c == 0)
                {
+                  printf("Client %s disconnected\n", client.name);
+
+                  // if the client is in a party, leave it, stop the game and send a message to the other players
+                  // not implemened yet
+
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &clients_size);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
@@ -152,16 +161,17 @@ static void app(void)
                   /* client sends a message */
                   /* if message starts with "/" it's a command */
                   if (buffer[0] == '/'){
-                     if (strcmp(buffer, "/quit") == 0){
+                     if (strcmp(buffer, "/disconnect") == 0){
                         printf("Client %s disconnected\n", client.name);
 
-                        // if the client is in a party, leave it and stop the game
+                        // if the client is in a party, leave it, stop the game and send a message to the other players
                         // not implemened yet
 
                         closesocket(clients[i].sock);
                         remove_client(clients, i, &clients_size);
                         strncpy(buffer, client.name,                 BUF_SIZE - 1);
                         strncat(buffer, " disconnected !",           BUF_SIZE - strlen(buffer) - 1);
+
                         for(i=0; i<clients_size; i++) {
                            int receiver_id = clients[i].sock;
                            send_message_to_client(clients, clients_size, 0, receiver_id, buffer);
@@ -178,13 +188,44 @@ static void app(void)
                            send_message_to_client(clients, clients_size, 0, client_id, message);
                         }
                      }
+                     
+                     else if (sscanf(buffer, "%s %s %[^\n]", command, user_id, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0) {
+                        printf("Client %s sent a private message\n", client.name);
+                        printf("To user_id: %s\n", user_id);
+                        printf("Message: %s\n", message);
+                        continue;
+                     }
+
+                     else if (strcmp(buffer, "/create_party") == 0){
+                        continue;
+                     }
+
+                     else if (strcmp(buffer, "/list_parties") == 0){
+                        continue;
+                     }
+
+                     else if (sscanf(buffer, "%s %s", command, party_id) == 2 && strncmp(command, "/join_party", strlen("/join_party")) == 0) {
+                        printf("Client %s joined a party\n", client.name);
+                        printf("Party_id: %s\n", party_id);
+                        // only can join a party if the user is in the lobby
+                        continue;
+                     }
+
+                     else if (strcmp(buffer, "/leave_party") == 0){
+                        // only can leave a party if the user is in a party
+                        continue;
+                     }
 
                      else if (strcmp(buffer, "/help") == 0){
                         printf("Client %s asked for help\n", client.name);
-                        strncpy(buffer, "Available commands\n",                      BUF_SIZE - 1);
-                        strncat(buffer, "/quit: disconnect from server\n",           BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/list_clients: list connected clients\n",   BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/send <<client_id>> <<message>>: send a message to a client\n",       BUF_SIZE - strlen(buffer) - 1);
+                        strncpy(buffer, "Available commands\n",                                                         BUF_SIZE - 1);
+                        strncat(buffer, "/disconnect: disconnect from server\n",                                        BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_clients: list connected clients\n",                                      BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/send <<client_id>> <<message>>: send a private message to a client\n",        BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/create_party: create a party\n",                                              BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_parties: list available parties\n",                                      BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/join_party <<party_id>>: join a party\n",                                     BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/leave_party: leave a party\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         send_message_to_client(clients, clients_size, 0, client_id, buffer);
                      }
 
@@ -195,11 +236,21 @@ static void app(void)
                         send_message_to_client(clients, clients_size, 0, client_id, buffer);
                      }
                   }
+
                   /* if buffer does not start with "/" then it's just a message */
                   else{
+
+                     // if the user is in the lobby
                      /** Send the message to everyone but himself
                       * for(i=0; i<clients_size; i++) {
                       * int receiver_id = clients[i].sock;
+                      * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
+                     } **/
+
+                     // if the user is in a party
+                     /** Send the message to everyone but himself
+                      * for(i=0; i<party_size; i++) {
+                      * int receiver_id = party_clients[i].sock;
                       * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
                      } **/
 
@@ -218,21 +269,19 @@ static void app(void)
    end_connection(sock);
 }
 
-static void clear_clients(Client *clients, int clients_size)
+Client get_client(Client *clients, char client_id)
 {
    int i = 0;
-   for(i = 0; i < clients_size; i++)
+   for(i = 0; i < MAX_CLIENTS; i++)
    {
-      closesocket(clients[i].sock);
+      if(clients[i].sock == client_id)
+      {
+         return clients[i];
+      }
    }
-}
 
-static void remove_client(Client *clients, int to_remove, int *clients_size)
-{
-   /* we remove the client in the array */
-   memmove(clients + to_remove, clients + to_remove + 1, (*clients_size - to_remove - 1) * sizeof(Client));
-   /* number client - 1 */
-   (*clients_size)--;
+   Client no_client = { 0, "No clients" };
+   return no_client;
 }
 
 void send_message_to_client(Client *clients, int clients_size, char sender_id, char receiver_id, const char *buffer)
@@ -249,33 +298,37 @@ void send_message_to_client(Client *clients, int clients_size, char sender_id, c
          if(sender_id == 0)
          {
             strncpy(message, "server", BUF_SIZE - 1);
-            strncat(message, ": ", sizeof message - strlen(message) - 1);
          }
          /* if sender_id != 0 then get the sender name */
          else
          {
-            // Client sender = get_client(clients, sender_id);
-            strncpy(message, "sender_name", BUF_SIZE - 1);
-            strncat(message, ": ", sizeof message - strlen(message) - 1);
+            Client sender = get_client(clients, sender_id);
+            strncpy(message, sender.name, BUF_SIZE - 1);
          }
+
+         strncat(message, ": ", sizeof message - strlen(message) - 1);
          strncat(message, buffer, sizeof message - strlen(message) - 1);
          write_client(receiver_id, message);
       }
    }
 }
 
-/** Client get_client(Client *clients, char id)
+static void clear_clients(Client *clients, int clients_size)
 {
    int i = 0;
-   for(i = 0; i < MAX_CLIENTS; i++)
+   for(i = 0; i < clients_size; i++)
    {
-      if(clients[i].sock == id)
-      {
-         return clients[i];
-      }
+      closesocket(clients[i].sock);
    }
-   return clients[0];
-} **/
+}
+
+static void remove_client(Client *clients, int to_remove, int *clients_size)
+{
+   /* we remove the client in the array */
+   memmove(clients + to_remove, clients + to_remove + 1, (*clients_size - to_remove - 1) * sizeof(Client));
+   /* number client - 1 */
+   (*clients_size)--;
+}
 
 static int init_connection(void)
 {
