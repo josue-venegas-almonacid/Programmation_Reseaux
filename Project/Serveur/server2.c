@@ -9,7 +9,6 @@
 
 #include "server2.h"
 #include "client2.h"
-#include "awale.h"
 
 /**
  * Initializes the necessary components for network communication.
@@ -393,13 +392,9 @@ static void write_client(SOCKET sock, const char *buffer)
 
 int main(int argc, char **argv)
 {
-
    init();
 
    app();
-
-   Awale awale = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
-   run_game(&awale);
 
    end();
 

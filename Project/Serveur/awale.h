@@ -12,9 +12,10 @@ typedef struct
     int score_two;
     int turn;
     int finished;
+    int player1Socket;
+    int player2Socket;
+    int observersSockets[10];
 } Awale;
-
-
 
 // Function declarations
 void display(Awale game);

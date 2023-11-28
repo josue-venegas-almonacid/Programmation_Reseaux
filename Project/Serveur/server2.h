@@ -13,9 +13,6 @@
 #include <arpa/inet.h>
 #include <unistd.h> /* close */
 #include <netdb.h> /* gethostbyname */
-#include "awale.h"
-#include "client2.h"
-
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #define closesocket(s) close(s)
@@ -23,14 +20,6 @@ typedef int SOCKET;
 typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr SOCKADDR;
 typedef struct in_addr IN_ADDR;
-typedef struct
-{
-    int game_id;
-    Client player_one;
-    Client player_two;
-    Client observers[10];
-    Awale game;
-} Party;
 
 #else
 
@@ -56,7 +45,5 @@ static void write_client(SOCKET sock, const char *buffer);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
-void send_message_to_client(Client *clients, int clients_size, char sender_id, char receiver_id, const char *buffer);
-Client get_client(Client *clients, char client_id);
 
 #endif /* guard */

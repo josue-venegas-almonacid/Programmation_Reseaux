@@ -1,6 +1,18 @@
 #include <stdio.h>
-#include "server2.h"
-#include "awale.h"
+
+// Definition of the Awale structure
+typedef struct
+{
+    int player_one[6];
+    int player_two[6];
+    int score_one;
+    int score_two;
+    int turn;
+    int finished;
+    int player1Socket;
+    int player2Socket;
+    int observersSockets[10];
+} Awale;
 
 
 #define CLEAR_SCREEN_ANSI "\033[H\033[J"
@@ -107,7 +119,28 @@ void make_move(Awale* game, int chosen_case, int player)
 void ask_player(Awale* game, int player)
 //*****************************
 {
+    int i = 0;
     int move;
+
+    // Check if the game is not finished
+    if (player == 1 && game->player_two[0] + game->player_two[1] + game->player_two[2] + game->player_two[3] + game->player_two[4] + game->player_two[5] == 0)
+    {
+        while ((i + game->player_one[i] < 6) && (i < 6)) i++; // Check if we can give seeds
+        if (i == 6)
+        {
+            game->finished = 1;
+            return; // Game over
+        }
+    }
+    else if (player == 2 && game->player_one[0] + game->player_one[1] + game->player_one[2] + game->player_one[3] + game->player_one[4] + game->player_one[5] == 0)
+    {
+        while ((i + game->player_two[i] < 6) && (i < 6)) i++; // Check if we can give seeds
+        if (i == 6)
+        {
+            game->finished = 1;
+            return; // Game over
+        }
+    }
 
     printf("Your move: ");
     scanf("%d", &move);
@@ -141,34 +174,6 @@ void ask_player(Awale* game, int player)
         }
 
     make_move(game, move - 1, player);
-}
-
-int is_game_over(Awale* game) {
-    int i;
-    // Check if player one has any seeds left
-    for (i = 0; i < 6; i++) {
-        if (game->player_one[i] > 0) {
-            break;
-        }
-    }
-    if (i == 6) {
-        // Player one has no seeds left, game is over
-        return 1;
-    }
-
-    // Check if player two has any seeds left
-    for (i = 0; i < 6; i++) {
-        if (game->player_two[i] > 0) {
-            break;
-        }
-    }
-    if (i == 6) {
-        // Player two has no seeds left, game is over
-        return 1;
-    }
-
-    // Both players have seeds left, game is not over
-    return 0;
 }
 
 // Assign the remaining seeds when the game is over
@@ -210,9 +215,6 @@ void run_game(Awale* game)
     {
         ask_player(game, game->turn);
         display(*game);
-        if (is_game_over(game)) {
-            game->finished = 1;
-        }
     }
     finish_game(game);
     display_winner(*game);
