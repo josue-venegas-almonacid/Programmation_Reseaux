@@ -53,10 +53,9 @@ static int init_connection(void);
 static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
-static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
-void send_message_to_client(Client *clients, int clients_size, char sender_id, char receiver_id, const char *buffer);
+void send_message_to_client(Client *clients, char sender_id, char receiver_id, const char *buffer);
 Client get_client(Client *clients, char client_id);
 
 #endif /* guard */
