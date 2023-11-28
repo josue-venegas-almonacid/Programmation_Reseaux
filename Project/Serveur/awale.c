@@ -1,39 +1,30 @@
 #include <stdio.h>
-
-// Definition of the Awale structure
-typedef struct
-{
-    int player_one[6];
-    int player_two[6];
-    int score_one;
-    int score_two;
-    int turn;
-    int finished;
-    int player1Socket;
-    int player2Socket;
-    int observersSockets[10];
-} Awale;
-
+#include "awale.h"
 
 #define CLEAR_SCREEN_ANSI "\033[H\033[J"
+#define BUF_SIZE    1024
 
 // Display the Awale board on the screen
 //*************************************
-void display(Awale game)
-//*************************************
-{
-    printf(CLEAR_SCREEN_ANSI);
-    printf("\n\n\nTurn: %s\n\n", (game.turn == 1 ? "Player One" : "Player Two"));
+char* display(Awale game) {
+    static char buffer[BUF_SIZE];  // Static buffer to hold the message
 
-    printf("   Player Two Score: %d\n", game.score_two);
-    printf("   Player One Score: %d\n", game.score_one);
-    printf("   ┌─────┬─────┬─────┬─────┬─────┬─────┐\n");
-    printf("   │ %3d │ %3d │ %3d │ %3d │ %3d │ %3d │\n",
-           game.player_two[5], game.player_two[4], game.player_two[3], game.player_two[2], game.player_two[1], game.player_two[0]);
-    printf("   ├─────┼─────┼─────┼─────┼─────┼─────┤\n");
-    printf("   │ %3d │ %3d │ %3d │ %3d │ %3d │ %3d │\n",
-           game.player_one[0], game.player_one[1], game.player_one[2], game.player_one[3], game.player_one[4], game.player_one[5]);
-    printf("   └─────┴─────┴─────┴─────┴─────┴─────┘\n");   
+    // Clear the screen ANSI code
+    snprintf(buffer, BUF_SIZE, "%s", CLEAR_SCREEN_ANSI);
+
+    // Append the rest of the message
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "\n\n\nTurn: %s\n\n", (game.turn == 1 ? "Player One" : "Player Two"));
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   Player Two Score: %d\n", game.score_two);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   Player One Score: %d\n", game.score_one);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   ┌─────┬─────┬─────┬─────┬─────┬─────┐\n");
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   │ %3d │ %3d │ %3d │ %3d │ %3d │ %3d │\n",
+             game.player_two[5], game.player_two[4], game.player_two[3], game.player_two[2], game.player_two[1], game.player_two[0]);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   ├─────┼─────┼─────┼─────┼─────┼─────┤\n");
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   │ %3d │ %3d │ %3d │ %3d │ %3d │ %3d │\n",
+             game.player_one[0], game.player_one[1], game.player_one[2], game.player_one[3], game.player_one[4], game.player_one[5]);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   └─────┴─────┴─────┴─────┴─────┴─────┘\n");
+
+    return buffer;
 }
 
 // Player makes a move between 0 and 5
@@ -116,35 +107,9 @@ void make_move(Awale* game, int chosen_case, int player)
 
 // Ask Player for a move and play it
 //*****************************
-void ask_player(Awale* game, int player)
+void check_move(Awale* game, int player, int move)
 //*****************************
 {
-    int i = 0;
-    int move;
-
-    // Check if the game is not finished
-    if (player == 1 && game->player_two[0] + game->player_two[1] + game->player_two[2] + game->player_two[3] + game->player_two[4] + game->player_two[5] == 0)
-    {
-        while ((i + game->player_one[i] < 6) && (i < 6)) i++; // Check if we can give seeds
-        if (i == 6)
-        {
-            game->finished = 1;
-            return; // Game over
-        }
-    }
-    else if (player == 2 && game->player_one[0] + game->player_one[1] + game->player_one[2] + game->player_one[3] + game->player_one[4] + game->player_one[5] == 0)
-    {
-        while ((i + game->player_two[i] < 6) && (i < 6)) i++; // Check if we can give seeds
-        if (i == 6)
-        {
-            game->finished = 1;
-            return; // Game over
-        }
-    }
-
-    printf("Your move: ");
-    scanf("%d", &move);
-
     // Move between 1 and 6
     while ((move < 1) || (move > 6))
     {
@@ -176,6 +141,34 @@ void ask_player(Awale* game, int player)
     make_move(game, move - 1, player);
 }
 
+int is_game_over(Awale* game) {
+    int i;
+    // Check if player one has any seeds left
+    for (i = 0; i < 6; i++) {
+        if (game->player_one[i] > 0) {
+            break;
+        }
+    }
+    if (i == 6) {
+        // Player one has no seeds left, game is over
+        return 1;
+    }
+
+    // Check if player two has any seeds left
+    for (i = 0; i < 6; i++) {
+        if (game->player_two[i] > 0) {
+            break;
+        }
+    }
+    if (i == 6) {
+        // Player two has no seeds left, game is over
+        return 1;
+    }
+
+    // Both players have seeds left, game is not over
+    return 0;
+}
+
 // Assign the remaining seeds when the game is over
 //******************************
 void finish_game(Awale* game)
@@ -193,15 +186,21 @@ void finish_game(Awale* game)
 
 // Display the winner
 //************************************
-void display_winner(Awale game)
-//************************************
-{
+char* display_winner(Awale game) {
+    static char buffer[BUF_SIZE];  // Static buffer to hold the message
+
+    // Clear the screen ANSI code
+    snprintf(buffer, BUF_SIZE, "%s", CLEAR_SCREEN_ANSI);
+
+    // Append the winner message
     if (game.score_one > game.score_two)
-        printf("The winner is Player One!\n Congratulations!\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is Player One!\n Congratulations!\n\n");
     else if (game.score_one < game.score_two)
-        printf("The winner is Player Two!\n Congratulations.\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is Player Two!\n Congratulations.\n\n");
     else
-        printf("It's a draw!\n Good job to both players.\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "It's a draw!\n Good job to both players.\n\n");
+
+    return buffer;
 }
 
 
@@ -209,20 +208,37 @@ void run_game(Awale* game)
 //*********************************
 {
     int i;
+    int move;
 
-    display(*game);
+    //display(*game);
+
+    char* displayMessage = display_winner(*game);
+    // Print the message ( change with send to client)
+    printf("%s", displayMessage);
+
     while (game->finished == 0)
     {
-        ask_player(game, game->turn);
-        display(*game);
+        if (is_game_over(game)) {
+            game->finished = 1;
+            break;
+        }
+        printf("Your move: ");
+        scanf("%d", &move);
+        check_move(game, game->turn, move);
+        //display(*game);
+
+        char* displayMessage = display(*game);
+        // Print the message
+        printf("%s", displayMessage);
     }
     finish_game(game);
-    display_winner(*game);
+    displayMessage = display_winner(*game);
+    printf("%s", displayMessage);
 }
 
-int main()
+/*int main()
 {
     Awale awale = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
     run_game(&awale);
     return 0;
-}
+}*/

@@ -9,6 +9,8 @@
 
 #include "server2.h"
 #include "client2.h"
+#include "awale.h"
+
 
 /**
  * Initializes the necessary components for network communication.
@@ -197,7 +199,11 @@ static void app(void)
                      }
 
                      else if (strcmp(buffer, "/create_party") == 0){
-                        continue;
+                        //test printing the game
+                        Awale game = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
+                        char* displayMessage = display(game);
+                        // Print the message ( change with send to client)
+                        send_message_to_client(clients, clients_size, 0, client_id, displayMessage);
                      }
 
                      else if (strcmp(buffer, "/list_parties") == 0){
