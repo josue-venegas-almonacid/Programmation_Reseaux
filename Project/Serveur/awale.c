@@ -107,38 +107,33 @@ void make_move(Awale* game, int chosen_case, int player)
 
 // Ask Player for a move and play it
 //*****************************
-void check_move(Awale* game, int player, int move)
-//*****************************
-{
+int check_move(Awale* game, int player, int move, char* buffer) {
     // Move between 1 and 6
-    while ((move < 1) || (move > 6))
-    {
-        printf("Enter a number between 1 and 6: ");
-        scanf("%d", &move);
+    if (move < 1 || move > 6) {
+        snprintf(buffer, BUF_SIZE, "Enter a number between 1 and 6");
+        return 1;  // Invalid move
     }
 
     // Play a non-empty case
-    while ((player == 1 && game->player_one[move - 1] == 0) || (player == 2 && game->player_two[move - 1] == 0))
-    {
-        printf("You must play a non-empty case: ");
-        scanf("%d", &move);
+    if ((player == 1 && game->player_one[move - 1] == 0) || (player == 2 && game->player_two[move - 1] == 0)) {
+        snprintf(buffer, BUF_SIZE, "You must play a non-empty case");
+        return 1;  // Invalid move
     }
 
     // Check if the opponent has no seeds
     if (player == 1 && game->player_two[0] + game->player_two[1] + game->player_two[2] + game->player_two[3] + game->player_two[4] + game->player_two[5] == 0)
-        while (move + game->player_one[move - 1] < 7)
-        {
-            printf("You must give seeds! (stingy): ");
-            scanf("%d", &move);
+        if (move + game->player_one[move - 1] < 7) {
+            snprintf(buffer, BUF_SIZE, "You must give seeds! (stingy)");
+            return 1;  // Invalid move
         }
     else if (player == 2 && game->player_one[0] + game->player_one[1] + game->player_one[2] + game->player_one[3] + game->player_one[4] + game->player_one[5] == 0)
-        while (move - 1 + game->player_two[move - 1] < 6)
-        {
-            printf("You must give seeds! (stingy): ");
-            scanf("%d", &move);
+        if (move - 1 + game->player_two[move - 1] < 6) {
+            snprintf(buffer, BUF_SIZE, "You must give seeds! (stingy)");
+            return 1;  // Invalid move
         }
 
     make_move(game, move - 1, player);
+    return 0;  // Valid move
 }
 
 int is_game_over(Awale* game) {
@@ -207,33 +202,27 @@ char* display_winner(Awale game) {
 void run_game(Awale* game)
 //*********************************
 {
-    int i;
     int move;
+    char errorMessage[BUF_SIZE];
 
-    //display(*game);
-
-    char* displayMessage = display_winner(*game);
     // Print the message ( change with send to client)
-    printf("%s", displayMessage);
+    printf("%s", display(*game));
 
-    while (game->finished == 0)
+    while ( !game->finished )
     {
-        if (is_game_over(game)) {
-            game->finished = 1;
-            break;
-        }
         printf("Your move: ");
         scanf("%d", &move);
-        check_move(game, game->turn, move);
-        //display(*game);
-
-        char* displayMessage = display(*game);
-        // Print the message
-        printf("%s", displayMessage);
+        while (check_move(game, game->turn, move, errorMessage))
+        {
+            printf("%s:\n", errorMessage);
+            scanf("%d", &move);
+        }
+        printf("%s", display(*game));
+        if (is_game_over(game))
+            game->finished = 1;
     }
     finish_game(game);
-    displayMessage = display_winner(*game);
-    printf("%s", displayMessage);
+    printf("%s", display_winner(*game));
 }
 
 /*int main()

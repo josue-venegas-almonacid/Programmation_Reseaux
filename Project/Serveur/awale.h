@@ -17,7 +17,8 @@ typedef struct
 // Function declarations
 char* display(Awale game);
 void make_move(Awale* game, int chosen_case, int player);
-void ask_player(Awale* game, int player);
+int check_move(Awale* game, int player, int move, char* buffer);
+int is_game_over(Awale* game);
 void finish_game(Awale* game);
 char* display_winner(Awale game);
 void run_game(Awale* game);
