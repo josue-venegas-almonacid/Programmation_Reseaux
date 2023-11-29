@@ -43,7 +43,7 @@ static void end(void)
 /**
  * The main application function. It initializes the server,
 */
-static void app(void)
+static void app(Awale* game)
 {
    // The socket for the server
    int sock = init_connection();
@@ -54,6 +54,8 @@ static void app(void)
    char user_id[BUF_SIZE];
    char message[BUF_SIZE];
    char party_id[BUF_SIZE];
+   int move;
+   char errorMessage[BUF_SIZE];
 
    // The number of clients
    int clients_size = 0;
@@ -61,6 +63,14 @@ static void app(void)
    int max = sock;
    // The list of clients
    Client clients[MAX_CLIENTS];
+
+   // Create party with two players
+   //************************************
+   Party party = { 1 };
+   party.game = game;
+   party.player_one = 4;
+   party.player_two = 5;
+   party.turn = 4;
 
    // The set of file descriptors
    fd_set rdfs;
@@ -127,6 +137,7 @@ static void app(void)
          clients_size++;
 
          printf("New client connected as %s with csok %i\n", c.name, csock);
+         write_client(csock, display(*game));
       }
       else
       {
@@ -139,9 +150,42 @@ static void app(void)
                Client client = clients[i];
                int client_id = clients[i].sock;
 
-               int c = read_client(client_id, buffer);
+               // Send the initial game state to the client
+               write_client(party.player_one, display(*game));
+               write_client(party.player_two, display(*game));
+
+               if ( !game->finished && client_id == party.turn) {
+                  // Player One's move
+                  snprintf(buffer, BUF_SIZE, "Your move: ");
+                  write_client(client_id, buffer);
+
+                  read_client(client_id, buffer);
+                  sscanf(buffer, "%d", &move);
+                  while (check_move(game, game->turn, move, errorMessage)) {
+                        write_client(client_id, errorMessage);
+                        read_client(client_id, buffer);
+                        sscanf(buffer, "%d", &move);
+                  }
+
+                  write_client(client_id, display(*game));
+                  if (is_game_over(game))
+                     game->finished = 1;
+                  party.turn = (party.turn == 4) ? 5 : 4;
+               }
+               else if ( !game->finished && client_id != party.turn) {
+                  // Player Two's move
+                  snprintf(buffer, BUF_SIZE, "Waiting for the other player move...");
+                  write_client(client_id, buffer);
+               }
+               else {
+                  // Finish the game and display the winner
+                  finish_game(game);
+                  write_client(client_id, display_winner(*game));
+               }
+
+               // int c = read_client(client_id, buffer);
                /* client disconnected */
-               if(c == 0)
+               /** if(c == 0)
                {
                   printf("Client %s disconnected\n", client.name);
 
@@ -160,8 +204,8 @@ static void app(void)
                }
                else
                {
-                  /* client sends a message */
-                  /* if message starts with "/" it's a command */
+                  / client sends a message
+                  / if message starts with "/" it's a command
                   if (buffer[0] == '/'){
                      if (strcmp(buffer, "/disconnect") == 0){
                         printf("Client %s disconnected\n", client.name);
@@ -200,7 +244,6 @@ static void app(void)
 
                      else if (strcmp(buffer, "/create_party") == 0){
                         //test printing the game
-                        Awale game = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
                         char* displayMessage = display(game);
                         // Print the message ( change with send to client)
                         send_message_to_client(clients, clients_size, 0, client_id, displayMessage);
@@ -243,7 +286,7 @@ static void app(void)
                      }
                   }
 
-                  /* if buffer does not start with "/" then it's just a message */
+                  / if buffer does not start with "/" then it's just a message
                   else{
 
                      // if the user is in the lobby
@@ -258,13 +301,15 @@ static void app(void)
                       * for(i=0; i<party_size; i++) {
                       * int receiver_id = party_clients[i].sock;
                       * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
-                     } **/
+                     } 
 
                      // hard-coded messaging between two clients
+
                      if (client_id == 5) send_message_to_client(clients, clients_size, client_id, 4, buffer);
                      if (client_id == 4) send_message_to_client(clients, clients_size, client_id, 5, buffer);
-                  }
-               }
+                  } 
+               }**/
+               
                break;
             }
          }
@@ -398,9 +443,10 @@ static void write_client(SOCKET sock, const char *buffer)
 
 int main(int argc, char **argv)
 {
+   Awale game={ {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
    init();
 
-   app();
+   app(&game);
 
    end();
 

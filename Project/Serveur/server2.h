@@ -39,16 +39,17 @@ typedef struct in_addr IN_ADDR;
 
 typedef struct
 {
-   int game_id;
-   Client player_one;
-   Client player_two;
-   Client observers[100];
-   Awale game;
+   int id;
+   int player_one;
+   int player_two;
+   int observers[100];
+   Awale* game;
+   int turn;
 }Party;
 
 static void init(void);
 static void end(void);
-static void app(void);
+static void app(Awale* game);
 static int init_connection(void);
 static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
