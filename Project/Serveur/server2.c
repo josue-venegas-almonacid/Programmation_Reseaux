@@ -137,7 +137,6 @@ static void app(Awale* game)
          clients_size++;
 
          printf("New client connected as %s with csok %i\n", c.name, csock);
-         write_client(csock, display(*game));
       }
       else
       {
@@ -149,43 +148,10 @@ static void app(Awale* game)
             {
                Client client = clients[i];
                int client_id = clients[i].sock;
-
-               // Send the initial game state to the client
-               write_client(party.player_one, display(*game));
-               write_client(party.player_two, display(*game));
-
-               if ( !game->finished && client_id == party.turn) {
-                  // Player One's move
-                  snprintf(buffer, BUF_SIZE, "Your move: ");
-                  write_client(client_id, buffer);
-
-                  read_client(client_id, buffer);
-                  sscanf(buffer, "%d", &move);
-                  while (check_move(game, game->turn, move, errorMessage)) {
-                        write_client(client_id, errorMessage);
-                        read_client(client_id, buffer);
-                        sscanf(buffer, "%d", &move);
-                  }
-
-                  write_client(client_id, display(*game));
-                  if (is_game_over(game))
-                     game->finished = 1;
-                  party.turn = (party.turn == 4) ? 5 : 4;
-               }
-               else if ( !game->finished && client_id != party.turn) {
-                  // Player Two's move
-                  snprintf(buffer, BUF_SIZE, "Waiting for the other player move...");
-                  write_client(client_id, buffer);
-               }
-               else {
-                  // Finish the game and display the winner
-                  finish_game(game);
-                  write_client(client_id, display_winner(*game));
-               }
-
-               // int c = read_client(client_id, buffer);
+               
+               int c = read_client(client_id, buffer);
                /* client disconnected */
-               /** if(c == 0)
+               if(c == 0)
                {
                   printf("Client %s disconnected\n", client.name);
 
@@ -204,8 +170,8 @@ static void app(Awale* game)
                }
                else
                {
-                  / client sends a message
-                  / if message starts with "/" it's a command
+                  /* client sends a message */
+                  /* if message starts with "/" it's a command */
                   if (buffer[0] == '/'){
                      if (strcmp(buffer, "/disconnect") == 0){
                         printf("Client %s disconnected\n", client.name);
@@ -244,9 +210,12 @@ static void app(Awale* game)
 
                      else if (strcmp(buffer, "/create_party") == 0){
                         //test printing the game
-                        char* displayMessage = display(game);
+                        char* displayMessage = display(*game);
                         // Print the message ( change with send to client)
                         send_message_to_client(clients, 0, client_id, displayMessage);
+                     }
+
+                     else if (strcmp(buffer, "/list_parties") == 0){
                         continue;
                      }
 
@@ -274,6 +243,27 @@ static void app(Awale* game)
                         strncat(buffer, "/leave_party: leave a party\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         send_message_to_client(clients, 0, client_id, buffer);
                      }
+                     else if (strcmp(buffer, "/chat") == 0){
+                        
+                        // if the user is in the lobby
+                        /** Send the message to everyone but himself
+                        * for(i=0; i<clients_size; i++) {
+                        * int receiver_id = clients[i].sock;
+                        * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
+                        } **/
+
+                        // if the user is in a party
+                        /** Send the message to everyone but himself
+                        * for(i=0; i<party_size; i++) {
+                        * int receiver_id = party_clients[i].sock;
+                        * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
+                        } **/
+
+                        // hard-coded messaging between two clients
+
+                        if (client_id == 5) send_message_to_client(clients, client_id, 4, buffer);
+                        if (client_id == 4) send_message_to_client(clients, client_id, 5, buffer);
+                     }
 
                      else{
                         printf("Client %s sent an unknown command\n", client.name);
@@ -283,30 +273,51 @@ static void app(Awale* game)
                      }
                   }
 
-                  / if buffer does not start with "/" then it's just a message
+                  /* if buffer does not start with "/" then it's just a message */
                   else{
+                     // Send the initial game state to the client
+               write_client(party.player_one, display(*game));
+               write_client(party.player_two, display(*game));
 
-                     // if the user is in the lobby
-                     // Send the message to everyone but himself
-                      for(i=0; i<clients_size; i++) {
-                      int receiver_id = clients[i].sock;
-                      if (receiver_id != client_id) send_message_to_client(clients, client_id, receiver_id, buffer);
-                     }
+               if ( !game->finished && client_id == party.turn) {
+                  // Player One's move
+                  //snprintf(buffer, BUF_SIZE, "Your move: ");
+                  strncpy(buffer, "Your move: ", BUF_SIZE - 1);
+                  write_client(client_id, buffer);
 
-                     // if the user is in a party
-                     /** Send the message to everyone but himself
-                      * for(i=0; i<party_size; i++) {
-                      * int receiver_id = party_clients[i].sock;
-                      * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
-                     } 
+                  read_client(client_id, buffer);
+                  sscanf(buffer, "%d", &move);
+                  while (check_move(game, game->turn, move, errorMessage)) {
+                        write_client(client_id, errorMessage);
+                        read_client(client_id, buffer);
+                        sscanf(buffer, "%d", &move);
+                  }
 
-                     // hard-coded messaging between two clients
+                  write_client(party.player_one, display(*game));
+                  write_client(party.player_two, display(*game));
+                  if (is_game_over(game))
+                     game->finished = 1;
+                  party.turn = (party.turn == 4) ? 5 : 4;
+               }
+               else if ( !game->finished && client_id != party.turn) {
+                  printf("Waiting for the other player move...\n");
+                  // Player Two's move
+                  snprintf(buffer, BUF_SIZE, "Waiting for the other player move...");
+                  if (client_id == party.player_one)
+                     write_client(party.player_two, buffer);
+                  else if (client_id == party.player_two)
+                     write_client(party.player_one, buffer); 
+               }
+               else {
+                  // Finish the game and display the winner
+                  printf("the game is finished\n");
+                  finish_game(game);
+                  write_client(party.player_one, display_winner(*game));
+                  write_client(party.player_two, display_winner(*game));
+               }
+                  }
+               }
 
-                     if (client_id == 5) send_message_to_client(clients, clients_size, client_id, 4, buffer);
-                     if (client_id == 4) send_message_to_client(clients, clients_size, client_id, 5, buffer);
-                  } 
-               }**/
-               
                break;
             }
          }
