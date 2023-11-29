@@ -199,7 +199,7 @@ static void app(Awale* game)
 
                   for(i=0; i<clients_size; i++) {
                      int receiver_id = clients[i].sock;
-                     send_message_to_client(clients, clients_size, 0, receiver_id, buffer);
+                     send_message_to_client(clients, 0, receiver_id, buffer);
                   }
                }
                else
@@ -220,7 +220,7 @@ static void app(Awale* game)
 
                         for(i=0; i<clients_size; i++) {
                            int receiver_id = clients[i].sock;
-                           send_message_to_client(clients, clients_size, 0, receiver_id, buffer);
+                           send_message_to_client(clients, 0, receiver_id, buffer);
                         }
                      }
 
@@ -231,7 +231,7 @@ static void app(Awale* game)
                            message[0] = 0;
                            strncpy(message, clients[i].name, BUF_SIZE - 1);
                            strncat(message, "\n", BUF_SIZE - strlen(message) - 1);
-                           send_message_to_client(clients, clients_size, 0, client_id, message);
+                           send_message_to_client(clients, 0, client_id, message);
                         }
                      }
                      
@@ -246,10 +246,7 @@ static void app(Awale* game)
                         //test printing the game
                         char* displayMessage = display(game);
                         // Print the message ( change with send to client)
-                        send_message_to_client(clients, clients_size, 0, client_id, displayMessage);
-                     }
-
-                     else if (strcmp(buffer, "/list_parties") == 0){
+                        send_message_to_client(clients, 0, client_id, displayMessage);
                         continue;
                      }
 
@@ -275,14 +272,14 @@ static void app(Awale* game)
                         strncat(buffer, "/list_parties: list available parties\n",                                      BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/join_party <<party_id>>: join a party\n",                                     BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/leave_party: leave a party\n",                                                BUF_SIZE - strlen(buffer) - 1);
-                        send_message_to_client(clients, clients_size, 0, client_id, buffer);
+                        send_message_to_client(clients, 0, client_id, buffer);
                      }
 
                      else{
                         printf("Client %s sent an unknown command\n", client.name);
                         strncpy(buffer, "Unknown command\n",                               BUF_SIZE - 1);
                         strncat(buffer, "Type /help for a list of available commands\n",   BUF_SIZE - strlen(buffer) - 1);
-                        send_message_to_client(clients, clients_size, 0, client_id, buffer);
+                        send_message_to_client(clients, 0, client_id, buffer);
                      }
                   }
 
@@ -290,11 +287,11 @@ static void app(Awale* game)
                   else{
 
                      // if the user is in the lobby
-                     /** Send the message to everyone but himself
-                      * for(i=0; i<clients_size; i++) {
-                      * int receiver_id = clients[i].sock;
-                      * if (receiver_id != client_id) send_message_to_client(clients, clients_size, client_id, receiver_id, buffer);
-                     } **/
+                     // Send the message to everyone but himself
+                      for(i=0; i<clients_size; i++) {
+                      int receiver_id = clients[i].sock;
+                      if (receiver_id != client_id) send_message_to_client(clients, client_id, receiver_id, buffer);
+                     }
 
                      // if the user is in a party
                      /** Send the message to everyone but himself
@@ -335,33 +332,26 @@ Client get_client(Client *clients, char client_id)
    return no_client;
 }
 
-void send_message_to_client(Client *clients, int clients_size, char sender_id, char receiver_id, const char *buffer)
+void send_message_to_client(Client *clients, char sender_id, char receiver_id, const char *buffer)
 {
    int i = 0;
    char message[BUF_SIZE];
    message[0] = 0;
-   for(i = 0; i < clients_size; i++)
+   
+   if(sender_id == 0)
    {
-      /* we send message only to the receiver */
-      if(receiver_id == clients[i].sock)
-      {
-         /* if sender_id == 0 then the sender is the server */
-         if(sender_id == 0)
-         {
-            strncpy(message, "server", BUF_SIZE - 1);
-         }
-         /* if sender_id != 0 then get the sender name */
-         else
-         {
-            Client sender = get_client(clients, sender_id);
-            strncpy(message, sender.name, BUF_SIZE - 1);
-         }
-
-         strncat(message, ": ", sizeof message - strlen(message) - 1);
-         strncat(message, buffer, sizeof message - strlen(message) - 1);
-         write_client(receiver_id, message);
-      }
+      strncpy(message, "server", BUF_SIZE - 1);
    }
+   /* if sender_id != 0 then get the sender name */
+   else
+   {
+      Client sender = get_client(clients, sender_id);
+      strncpy(message, sender.name, BUF_SIZE - 1);
+   }
+
+   strncat(message, ": ", sizeof message - strlen(message) - 1);
+   strncat(message, buffer, sizeof message - strlen(message) - 1);
+   write_client(receiver_id, message);
 }
 
 static void clear_clients(Client *clients, int clients_size)
