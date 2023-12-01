@@ -12,15 +12,22 @@
 #include "awale.h"
 
 /** TODO: 
- * - Check cases when the user do something to an user that does not exist/is not connected
- * - Check cases when the user do something to a party that does not exist
+ * - Add bio
+ * - Add friends
+ * - Add challenges
+ * - Add private party
+ * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
+ * - Add game
+ * - Save a finished game
+ * - Replay a saved game
  * - Check cases when the user leaves a party and the game has started
- * - Check cases when the user disconnects and he is in a party
  * - Check cases when the user disconnects and he is in a party and the game has started
- * - Implement dynamic memory allocation (malloc, realloc, free)
+ * - Implement dynamic memory allocation (realloc, free) to list of clients and parties
+ * - Implement fork() to handle multiple games at the same time
+ * - Add ranking
  * - (OPTIONAL) improve the console interface for the client
- * - (OPTIONAL) implement colors to display messages (errors, private messages, etc.)
- * - (OPTIONAL) FIX: if the user is typing while a message is received, the message is not displayed correctly
+ * - (OPTIONAL) fix: if the user is typing while a message is received, the message is not displayed correctly
+ * - (OPTIONAL) display the /help commands depending on the context (lobby, party, game)
 */
 
 /**
