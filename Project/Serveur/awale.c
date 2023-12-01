@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "awale.h"
 
 #define CLEAR_SCREEN_ANSI "\033[H\033[J"
