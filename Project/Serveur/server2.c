@@ -75,6 +75,7 @@ static void app(void)
    char mode[BUF_SIZE];
    char message[BUF_SIZE];
 
+   // ASCII color codes for the messages
    char red[BUF_SIZE]   = "\033[0;31m";
    char green[BUF_SIZE] = "\033[0;32m";
    char yellow[BUF_SIZE]= "\033[0;33m";
