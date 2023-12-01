@@ -77,8 +77,8 @@ Client* get_client_by_id(Client *clients, int clients_size, int client_id);
 Client* get_client_by_username(Client *clients, int clients_size, char* username);
 Party*  get_party_by_id(Party *parties, int parties_size, int party_id);
 
-void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_id, char *buffer);
-void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer);
+void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_id, char *buffer, char *color);
+void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color);
 
 static void old_create_party(Client *clients, int clients_size, int owner_id, Awale* game);
 static void old_create_game();
