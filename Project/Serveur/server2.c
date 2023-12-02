@@ -1,3 +1,36 @@
+/** TODO: 
+ * ASSIGNED TO josue:
+ * - Add bio
+ * - Delete friends.
+ * - List friend requests, so the user can check if was disconnected and he has pending friend requests
+ * - Send challenges requests, list challenges requests, accept challenges, decline challenges
+ * - Create a function to give a party id (follow the same logic as the client id)
+ * 
+ * ASSIGNED TO hichem:
+ * - Create a party
+ * - Start a game
+ * - Save a finished game
+ * - Replay a saved game
+ * 
+ * ASSIGNED TO josue and hichem:
+ * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
+ * - Check cases when the user leaves a party and the game has started
+ * - Check cases when the user disconnects and he is in a party and the game has started
+ * 
+ * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
+ * - Implement fork() to handle multiple games at the same time
+ * - Add ranking
+ * - Add function signatures to the header files
+ * 
+ * 
+ * 
+ * - (OPTIONAL) fix:       /send and /broadcasting. instead of iterating over all the clients, iterate over party members only
+ * - (OPTIONAL) fix:       console. if the user is typing while a message is received, the message is not displayed correctly
+ * - (OPTIONAL) fix:       console. improve the console interface for the client
+ * - (OPTIONAL) feature:   console. display the /help commands depending on the context (lobby, party, game)
+ * - (OPTIONAL) feature:   sockets. if an user wants to connect with the same username, disconnect the previous user
+*/
+
 /* Libraries */
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,27 +43,6 @@
 #include "server2.h"
 #include "client2.h"
 #include "awale.h"
-
-/** TODO: 
- * - Add ID
- * - Add a function to assign the ID to the client for first time or the same ID if the client reconnects
- * - Add bio
- * - Add friends
- * - Add challenges
- * - Add private party
- * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
- * - Add game
- * - Save a finished game
- * - Replay a saved game
- * - Check cases when the user leaves a party and the game has started
- * - Check cases when the user disconnects and he is in a party and the game has started
- * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
- * - Implement fork() to handle multiple games at the same time
- * - Add ranking
- * - (OPTIONAL) improve the console interface for the client
- * - (OPTIONAL) fix: if the user is typing while a message is received, the message is not displayed correctly
- * - (OPTIONAL) display the /help commands depending on the context (lobby, party, game)
-*/
 
 /**
  * Initializes the necessary components for network communication.
@@ -103,10 +115,10 @@ static void app(void)
       // Add the connection socket to the set
       FD_SET(sock, &rdfs);
 
-      // Add socket of each client to the set
+      // Add socket of each connected client to the set
       for(int s = 0; s < clients_size; s++)
       {
-         FD_SET(clients[s].sock, &rdfs);
+         if(clients[s].sock != -1) FD_SET(clients[s].sock, &rdfs);
       }
 
       // If we overflow the maximum number of clients, we exit
@@ -122,7 +134,7 @@ static void app(void)
       // New client
       else if(FD_ISSET(sock, &rdfs))
       {
-         printf("New client trying to connect...\n");
+         printf("New connection\n");
          SOCKADDR_IN csin = { 0 };
          uid_t sinsize = sizeof csin;
 
@@ -143,30 +155,50 @@ static void app(void)
             continue;
          }
 
-         /* what is the new maximum socket number ? */
+         // Check the maximum number of sockets
          max = csock > max ? csock : max;
 
          FD_SET(csock, &rdfs);
 
-         // if the list of users is not full, add the new user
-         Client c = { 
-            sock: csock,
-            room_id: -1,
-            name: "",
-            bio: "",
-            challengers: { 0 },
-            challengers_size: 0,
-            friends: { 0 },
-            friends_size: 0
-         };
+         // Check if the user already exists
+         int id = user_exists(clients, clients_size, buffer);
 
-         strncpy(c.name, buffer, BUF_SIZE - 1);
-         clients[clients_size] = c;
-         clients_size++;
+         // If the user exists, reconnect him
+         if(id != -1)
+         {
+            Client* client = get_client_by_id(clients, clients_size, id);
 
-         printf("Client connected as %s with socket %i\n", c.name, c.sock);
+            // Update the socket
+            client->sock = csock;
 
-         // TODO: If the list of users is full, realloc
+            printf("EXISTING user connected as %s with ID %i and socket %i\n", client->name, client->id, client->sock);
+         }
+
+         // If the user does not exist, create a new user
+         else
+         {
+            // if the list of users is not full, add the new user
+            Client client = { 
+               sock: csock,
+               id: clients_size + 1,
+               party_id: -1,
+               name: "",
+               bio: "",
+               challengers: { 0 },
+               challengers_size: 0,
+               friends: { 0 },
+               friends_size: 0
+            };
+
+            strncpy(client.name, buffer, BUF_SIZE - 1);
+            clients[clients_size] = client;
+            
+            printf("NEW user connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
+            clients_size++;
+
+
+            // TODO: If the list of users is full, realloc
+         }
       }
 
       // Listen to all clients
@@ -176,9 +208,8 @@ static void app(void)
          {
             if(FD_ISSET(clients[i].sock, &rdfs))
             {
-               int client_id = clients[i].sock;
                
-               int c = read_client(client_id, buffer);
+               int c = read_client(clients[i].sock, buffer);
 
                // Client disconnected
                if(c == 0)
@@ -188,15 +219,13 @@ static void app(void)
                   // TODO: If the client is in a game, stop it, leave the party and send a message to the other players
 
                   closesocket(clients[i].sock);
-                  remove_client(clients, i, &clients_size);
+                  clients[i].sock = -1;
+
+                  // Send a message to all the users in the lobby
                   strncpy(buffer, clients[i].name, BUF_SIZE - 1);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
 
-                  for(int j = 0; j < clients_size; j++)
-                  {
-                     int receiver_id = clients[j].sock;
-                     send_message_to_client(clients, clients_size, 0, receiver_id, buffer, yellow);
-                  }
+                  broadcast_message(clients, clients_size, 0, -1, buffer, red);
                }
 
                // Client sent a message
@@ -213,10 +242,17 @@ static void app(void)
                         for(int u = 0; u < clients_size; u++)
                         {
                            strncat(buffer, clients[u].name,             BUF_SIZE - strlen(buffer) - 1);
-                           if (clients[u].room_id == -1)
+                           
+                           if(clients[u].sock == -1)
+                           {
+                              strncat(buffer, " (DISCONNECTED)\n",      BUF_SIZE - strlen(buffer) - 1);
+                           }
+
+                           else if(clients[u].party_id == -1)
                            {
                               strncat(buffer, " (LOBBY)\n",             BUF_SIZE - strlen(buffer) - 1);
                            }
+                           
                            else
                            {
                               strncat(buffer, " (PARTY ID: ",           BUF_SIZE - strlen(buffer) - 1);
@@ -229,10 +265,10 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %[^\n]", command, message) == 2 && strncmp(command, "/chat", strlen("/chat")) == 0)
                      {
-                        printf("The user %s tried to send a message to the room %d\n", clients[i].name, clients[i].room_id);
+                        printf("The user %s tried to send a message to the room %d\n", clients[i].name, clients[i].party_id);
                         
                         // Send the message to all the users in the room (lobby/party)
-                        broadcast_message(clients, clients_size, clients[i].sock, clients[i].room_id, message, blue);
+                        broadcast_message(clients, clients_size, clients[i].id, clients[i].party_id, message, blue);
                      }
 
                      else if(sscanf(buffer, "%s %s %[^\n]", command, other_username, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0)
@@ -260,7 +296,8 @@ static void app(void)
                            // If the receiver exists, send the message
                            else
                            {
-                              send_message_to_client(clients, clients_size, clients[i].sock, receiver->sock, message, yellow);
+                              send_message_to_client(clients, clients_size, clients[i].id, receiver->sock, message, yellow);
+
                               strncpy(buffer, "Message sent\n", BUF_SIZE - 1);
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
                            }
@@ -270,7 +307,7 @@ static void app(void)
                      else if(sscanf(buffer, "%s %s", command, mode) == 2 && strncmp(command, "/create_party", strlen("/create_party")) == 0)
                      {
                         // Check if the user is in a party already
-                        if(clients[i].room_id != -1)
+                        if(clients[i].party_id != -1)
                         {
                            strncpy(buffer, "You are already in a party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -318,9 +355,9 @@ static void app(void)
 
                               // Join the party
                               // Save the party id to the client room attribute
-                              clients[i].room_id = party.id;
+                              clients[i].party_id = party.id;
 
-                              printf("User %s joined the party %d as a player\n", clients[i].name, clients[i].room_id);
+                              printf("User %s joined the party %d as a player\n", clients[i].name, clients[i].party_id);
 
                               // Send a message to the user
                               strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
@@ -379,7 +416,7 @@ static void app(void)
                      else if(sscanf(buffer, "%s %s %s", command, message, mode) == 3 && strncmp(command, "/join_party", strlen("/join_party")) == 0)
                      {
                         // Check if the user is in a party already
-                        if(clients[i].room_id != -1)
+                        if(clients[i].party_id != -1)
                         {
                            strncpy(buffer, "You are already in a party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -423,7 +460,7 @@ static void app(void)
                                     // TODO: If the list of spectators is full, realloc
 
                                     // Save the party id to the client room attribute
-                                    clients[i].room_id = party->id;
+                                    clients[i].party_id = party->id;
 
                                     // Send a message to the user
                                     strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
@@ -452,9 +489,9 @@ static void app(void)
 
                      else if(strcmp(buffer, "/leave_party") == 0)
                      {
-                        printf("The user %s tried to left the party %d\n", clients[i].name, clients[i].room_id);
+                        printf("The user %s tried to left the party %d\n", clients[i].name, clients[i].party_id);
                         // Check if the user is in a party
-                        if(clients[i].room_id == -1)
+                        if(clients[i].party_id == -1)
                         {
                            strncpy(buffer, "You are not in a party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -466,7 +503,7 @@ static void app(void)
                         else
                         {
                            // Save the lobby id to the client room attribute
-                           clients[i].room_id = -1;
+                           clients[i].party_id = -1;
 
                            // Send a message to the user
                            strncpy(buffer, "You left the party\n", BUF_SIZE - 1);
@@ -558,7 +595,7 @@ static void app(void)
                            int found = 0;
                            Client* other_user = get_client_by_username(clients, clients_size, other_username);
 
-                           if (other_user != NULL)
+                           if(other_user != NULL)
                            {
                               for(int f = 0; f < clients[i].friend_requests_size; f++)
                               {
@@ -581,17 +618,17 @@ static void app(void)
                            else if(found == 1)
                            {
                               // Add the other user id into the user friends
-                              clients[i].friends[clients[i].friends_size] = other_user->sock;
+                              clients[i].friends[clients[i].friends_size] = other_user->id;
                               clients[i].friends_size++;
 
                               // Add the user id into the other user friends
-                              other_user->friends[other_user->friends_size] = clients[i].sock;
+                              other_user->friends[other_user->friends_size] = clients[i].id;
                               other_user->friends_size++;
 
                               // Remove the friend request from the user
                               for(int f = 0; f < clients[i].friend_requests_size; f++)
                               {
-                                 if(clients[i].friend_requests[f] == other_user->sock)
+                                 if(clients[i].friend_requests[f] == other_user->id)
                                  {
                                     // Remove the friend request in the user list
                                     memmove(clients[i].friend_requests + f, clients[i].friend_requests + f + 1, (clients[i].friend_requests_size - f - 1) * sizeof(int));
@@ -603,7 +640,7 @@ static void app(void)
                               // If this user also sent a friend request to the other user, remove the friend request in his list
                               for(int f = 0; f < other_user->friend_requests_size; f++)
                               {
-                                 if(other_user->friend_requests[f] == clients[i].sock)
+                                 if(other_user->friend_requests[f] == clients[i].id)
                                  {
                                     // Remove the friend request in the other user list
                                     memmove(other_user->friend_requests + f, other_user->friend_requests + f + 1, (other_user->friend_requests_size - f - 1) * sizeof(int));
@@ -613,14 +650,14 @@ static void app(void)
                               }
 
                               // Send a message to the user
-                              strncpy(buffer, "You are now friends with: ", BUF_SIZE - 1);
+                              strncpy(buffer, "Friend request accepted: ", BUF_SIZE - 1);
                               strncat(buffer, other_username, BUF_SIZE - strlen(buffer) - 1);
                               strncat(buffer, "\n", BUF_SIZE - strlen(buffer) - 1);
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
 
                               // Send a message to the other user
                               strncpy(buffer, clients[i].name, BUF_SIZE - 1);
-                              strncpy(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
                               send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
                            }
                         }
@@ -636,7 +673,23 @@ static void app(void)
                            Client* friend = get_client_by_id(clients, clients_size, clients[i].friends[u]);
 
                            strncat(buffer, friend->name,                      BUF_SIZE - strlen(buffer) - 1);
-                           strncat(buffer, "\n",                              BUF_SIZE - strlen(buffer) - 1);
+                           
+                           if(friend->sock == -1)
+                           {
+                              strncat(buffer, " (DISCONNECTED)\n",      BUF_SIZE - strlen(buffer) - 1);
+                           }
+
+                           else if(friend->party_id == -1)
+                           {
+                              strncat(buffer, " (LOBBY)\n",             BUF_SIZE - strlen(buffer) - 1);
+                           }
+                           
+                           else
+                           {
+                              strncat(buffer, " (PARTY ID: ",           BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, "TODO",                   BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, ")\n",                    BUF_SIZE - strlen(buffer) - 1);
+                           }
                         }
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
@@ -679,15 +732,31 @@ static void app(void)
       }
    }
 
+   // TODO: Here we should clear the list of clients, parties, spectators, friend requests, friends, challengers
+   // Not only closing the sockets
    clear_clients(clients, clients_size);
    end_connection(sock);
+}
+
+int user_exists(Client* clients, int clients_size, char* username)
+{
+   // Check in the list of clients. If the username exists, return the ID
+   for(int i = 0; i < clients_size; i++)
+   {
+      if(strcmp(clients[i].name, username) == 0)
+      {
+         return clients[i].id;
+      }
+   }
+
+   return -1;
 }
 
 Client* get_client_by_id(Client *clients, int clients_size, int client_id)
 {
    for(int i = 0; i < clients_size; i++)
    {
-      if(clients[i].sock == client_id)
+      if(clients[i].id == client_id)
       {
          return &clients[i];
       }
@@ -722,8 +791,10 @@ Party* get_party_by_id(Party *parties, int parties_size, int party_id)
    return NULL;
 }
 
-void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_id, char *buffer, char *color)
+void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color)
 {
+   if(receiver_socket == -1) return;
+
    char message[BUF_SIZE];
    message[0] = 0;
 
@@ -747,14 +818,14 @@ void send_message_to_client(Client *clients, int clients_size, int sender_id, in
    // Reset the color to white
    strncat(message, "\033[0;37m", BUF_SIZE - strlen(message) - 1);
 
-   write_client(receiver_id, message);
+   write_client(receiver_socket, message);
 }
 
-void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color)
+void broadcast_message(Client *clients, int clients_size, int sender_id, int party_id, char *buffer, char *color)
 {
    for(int i = 0; i < clients_size; i++)
    {
-      if(clients[i].room_id == room_id && clients[i].sock != sender_id)
+      if(clients[i].party_id == party_id && clients[i].id != sender_id)
       {
          send_message_to_client(clients, clients_size, sender_id, clients[i].sock, buffer, color);
       }
