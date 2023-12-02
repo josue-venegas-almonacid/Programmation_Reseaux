@@ -553,7 +553,7 @@ static void app(void)
                               // If the receiver is already a friend, display an error
                               for(int f = 0; f < clients[i].friends_size; f++)
                               {
-                                 if(clients[i].friends[f] == receiver->sock)
+                                 if(clients[i].friends[f] == receiver->id)
                                  {
                                     strncpy(buffer, "User is already a friend\n", BUF_SIZE - 1);
                                     send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -564,7 +564,7 @@ static void app(void)
                               // If the receiver has already a pending friend request from the sender, display an error
                               for(int f = 0; f < receiver->friend_requests_size; f++)
                               {
-                                 if(receiver->friend_requests[f] == clients[i].sock)
+                                 if(receiver->friend_requests[f] == clients[i].id)
                                  {
                                     strncpy(buffer, "Friend request already sent\n", BUF_SIZE - 1);
                                     send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -575,7 +575,7 @@ static void app(void)
                               if(can_add == 1)
                               {
                                  // Add the client id into the receiver friend requests
-                                 receiver->friend_requests[receiver->friend_requests_size] = clients[i].sock;
+                                 receiver->friend_requests[receiver->friend_requests_size] = clients[i].id;
                                  receiver->friend_requests_size++;
 
                                  // Send a message to the receiver
@@ -611,7 +611,7 @@ static void app(void)
                            {
                               for(int f = 0; f < clients[i].friend_requests_size; f++)
                               {
-                                 if(clients[i].friend_requests[f] == other_user->sock)
+                                 if(clients[i].friend_requests[f] == other_user->id)
                                  {
                                     found = 1;
                                     break;
@@ -622,7 +622,7 @@ static void app(void)
                            // If the user does not have a pending friend request from the other user, display an error
                            if(found == 0)
                            {
-                              strncpy(buffer, "You don't have any pending friend requests from this user\n", BUF_SIZE - 1);
+                              strncpy(buffer, "You don't have a pending friend request from this user\n", BUF_SIZE - 1);
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                            }
 
@@ -662,9 +662,7 @@ static void app(void)
                               }
 
                               // Send a message to the user
-                              strncpy(buffer, "Friend request accepted: ", BUF_SIZE - 1);
-                              strncat(buffer, other_username, BUF_SIZE - strlen(buffer) - 1);
-                              strncat(buffer, "\n", BUF_SIZE - strlen(buffer) - 1);
+                              strncpy(buffer, "Friend request accepted\n", BUF_SIZE - 1);
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
 
                               // Send a message to the other user
@@ -706,6 +704,53 @@ static void app(void)
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
 
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/delete_friend", strlen("/delete_friend")) == 0)
+                     {
+                        // Try to delete the friend
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        int found = 0;
+                        for(int f = 0; f < clients[i].friends_size; f++)
+                        {
+                           if(clients[i].friends[f] == other_user->id)
+                           {
+                              memmove(clients[i].friends + f, clients[i].friends + f + 1, (clients[i].friends_size - f - 1) * sizeof(int));
+                              clients[i].friends_size--;
+
+                              found = 1;
+                              break;
+                           }
+                        }
+
+                        // Try to delete the user from the other user friends
+                        if(found == 1)
+                        {
+                           for(int f = 0; f < other_user->friends_size; f++)
+                           {
+                              if(other_user->friends[f] == clients[i].id)
+                              {
+                                 memmove(other_user->friends + f, other_user->friends + f + 1, (other_user->friends_size - f - 1) * sizeof(int));
+                                 other_user->friends_size--;
+                                 break;
+                              }
+                           }
+                        }
+
+                        if(found == 0)
+                        {
+                           // If the user is not a friend, display an error
+                           strncpy(buffer, "User is not a friend\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           // Send a message to the user
+                           strncpy(buffer, "Friend deleted\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                        }
+                     }
+                     
                      else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/read_bio", strlen("/read_bio")) == 0)
                      {
                         printf("The user %s tried to read the bio of %s\n", clients[i].name, other_username);
@@ -753,6 +798,7 @@ static void app(void)
                         strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                         BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/accept_friend <<username>>: accept a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_friends: list all the friends\n",                                                BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/delete_friend <<username>>: delete a friend\n",                                       BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
