@@ -1,6 +1,5 @@
 /** TODO: 
  * ASSIGNED TO josue:
- * - Add bio
  * - Delete friends.
  * - List friend requests, so the user can check if was disconnected and he has pending friend requests
  * - Send challenges, list challenges, accept challenges, decline challenges
@@ -134,7 +133,7 @@ static void app(void)
       // New client
       else if(FD_ISSET(sock, &rdfs))
       {
-         printf("New connection\n");
+         printf("New client\n");
          SOCKADDR_IN csin = { 0 };
          uid_t sinsize = sizeof csin;
 
@@ -171,13 +170,13 @@ static void app(void)
             // Update the socket
             client->sock = csock;
 
-            printf("EXISTING user connected as %s with ID %i and socket %i\n", client->name, client->id, client->sock);
+            printf("User connected as %s with ID %i and socket %i\n", client->name, client->id, client->sock);
          }
 
          // If the user does not exist, create a new user
          else
          {
-            // if the list of users is not full, add the new user
+            // If the list of users is not full, add the new user
             Client client = { 
                sock: csock,
                id: clients_size + 1,
@@ -193,11 +192,15 @@ static void app(void)
             strncpy(client.name, buffer, BUF_SIZE - 1);
             clients[clients_size] = client;
             
-            printf("NEW user connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
+            printf("User connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
             clients_size++;
-
-
+            
             // TODO: If the list of users is full, realloc
+
+            // Send a message to all the users in the lobby
+            strncpy(buffer, clients[clients_size - 1].name, BUF_SIZE - 1);
+            strncat(buffer, " connected !", BUF_SIZE - strlen(buffer) - 1);
+            broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
          }
       }
 
@@ -225,7 +228,7 @@ static void app(void)
                   strncpy(buffer, clients[i].name, BUF_SIZE - 1);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
 
-                  broadcast_message(clients, clients_size, 0, -1, buffer, red);
+                  broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
                }
 
                // Client sent a message
@@ -293,13 +296,22 @@ static void app(void)
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                            }
 
-                           // If the receiver exists, send the message
+                           // If the receiver exists, try to send the message
                            else
                            {
-                              send_message_to_client(clients, clients_size, clients[i].id, receiver->sock, message, yellow);
+                              if(receiver->sock == -1)
+                              {
+                                 strncpy(buffer, "User is disconnected\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }
+                              else
+                              {
+                                 send_message_to_client(clients, clients_size, clients[i].id, receiver->sock, message, yellow);
 
-                              strncpy(buffer, "Message sent\n", BUF_SIZE - 1);
-                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                                 strncpy(buffer, "Message sent\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                              }
                            }
                         }
                      }
@@ -694,9 +706,43 @@ static void app(void)
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
 
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/read_bio", strlen("/read_bio")) == 0)
+                     {
+                        printf("The user %s tried to read the bio of %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+                        
+                        if(other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           strncpy(buffer, other_user->bio, BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                        }
+                     }
+
+                     else if(sscanf(buffer, "%s %[^\n]", command, message) == 2 && strncmp(command, "/update_bio", strlen("/update_bio")) == 0)
+                     {
+                        printf("The user %s tried to update his bio to: %s\n", clients[i].name, message);
+
+                        // Update the bio
+                        strncpy(clients[i].bio, message, BUF_SIZE - 1);
+
+                        // Send a message to the user
+                        strncpy(buffer, "Bio updated\n", BUF_SIZE - 1);
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
+                        strncat(buffer, "/update_bio <<bio>>: update your bio\n",                                               BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/read_bio <<username>>: read the bio of an user\n",                                    BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_users: list all the users connected\n",                                          BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/chat <<message>>: send a message to all users in the lobby or party\n",               BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/send <<username>> <<message>>: send a private message to an user\n",                  BUF_SIZE - strlen(buffer) - 1);
