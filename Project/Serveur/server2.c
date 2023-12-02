@@ -12,6 +12,8 @@
 #include "awale.h"
 
 /** TODO: 
+ * - Add ID
+ * - Add a function to assign the ID to the client for first time or the same ID if the client reconnects
  * - Add bio
  * - Add friends
  * - Add challenges
@@ -22,7 +24,7 @@
  * - Replay a saved game
  * - Check cases when the user leaves a party and the game has started
  * - Check cases when the user disconnects and he is in a party and the game has started
- * - Implement dynamic memory allocation (realloc, free) to list of clients and parties
+ * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
  * - Implement fork() to handle multiple games at the same time
  * - Add ranking
  * - (OPTIONAL) improve the console interface for the client
@@ -71,7 +73,7 @@ static void app(void)
    // The buffer for the messages
    char buffer[BUF_SIZE];
    char command[BUF_SIZE];
-   char receiver_username[BUF_SIZE];
+   char other_username[BUF_SIZE];
    char mode[BUF_SIZE];
    char message[BUF_SIZE];
 
@@ -233,12 +235,12 @@ static void app(void)
                         broadcast_message(clients, clients_size, clients[i].sock, clients[i].room_id, message, blue);
                      }
 
-                     else if(sscanf(buffer, "%s %s %[^\n]", command, receiver_username, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0)
+                     else if(sscanf(buffer, "%s %s %[^\n]", command, other_username, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0)
                      {
-                        printf("The user %s sent a message to %s\n", clients[i].name, receiver_username);
+                        printf("The user %s sent a message to %s\n", clients[i].name, other_username);
 
                         // The user can not send a message to himself
-                        if(strcmp(clients[i].name, receiver_username) == 0){
+                        if(strcmp(clients[i].name, other_username) == 0){
                            strncpy(buffer, "You can not send a message to yourself\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
@@ -246,7 +248,7 @@ static void app(void)
                         // Try to send the message
                         else
                         {
-                           Client* receiver = get_client_by_username(clients, clients_size, receiver_username);
+                           Client* receiver = get_client_by_username(clients, clients_size, other_username);
 
                            // If the receiver does not exist, display an error
                            if(receiver == NULL) 
@@ -472,12 +474,12 @@ static void app(void)
                         }
                      }
 
-                     else if(sscanf(buffer, "%s %[^\n]", command, receiver_username) == 2 && strncmp(command, "/add_friend", strlen("/add_friend")) == 0)
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/add_friend", strlen("/add_friend")) == 0)
                      {
-                        printf("The user %s sent a friend request to %s\n", clients[i].name, receiver_username);
+                        printf("The user %s sent a friend request to %s\n", clients[i].name, other_username);
 
                         // The user can not add himself as a friend
-                        if(strcmp(clients[i].name, receiver_username) == 0){
+                        if(strcmp(clients[i].name, other_username) == 0){
                            strncpy(buffer, "You can not add yourself as a friend\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
@@ -485,7 +487,7 @@ static void app(void)
                         // Try to send the friend request
                         else
                         {
-                           Client* receiver = get_client_by_username(clients, clients_size, receiver_username);
+                           Client* receiver = get_client_by_username(clients, clients_size, other_username);
                            
                            // If the receiver does not exist, display an error
                            if(receiver == NULL) 
@@ -494,7 +496,7 @@ static void app(void)
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                            }
 
-                           // If the receiver exists, send the friend request
+                           // If the receiver exists, try to send the friend request
                            else
                            {
                               int can_add = 1;
@@ -539,17 +541,142 @@ static void app(void)
                         }
                      }
 
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_friend", strlen("/accept_friend")) == 0)
+                     {
+                        printf("The user %s accepted a friend request from %s\n", clients[i].name, other_username);
+
+                        // Check if the user has a pending friend request
+                        if(clients[i].friend_requests_size == 0)
+                        {
+                           strncpy(buffer, "You don't have any pending friend requests\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           // Check if the user has a pending friend request from the other user
+                           int found = 0;
+                           Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                           if (other_user != NULL)
+                           {
+                              for(int f = 0; f < clients[i].friend_requests_size; f++)
+                              {
+                                 if(clients[i].friend_requests[f] == other_user->sock)
+                                 {
+                                    found = 1;
+                                    break;
+                                 }
+                              }  
+                           }
+                           
+                           // If the user does not have a pending friend request from the other user, display an error
+                           if(found == 0)
+                           {
+                              strncpy(buffer, "You don't have any pending friend requests from this user\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+
+                           // If the user has a pending friend request from the other user, try to add him
+                           else if(found == 1)
+                           {
+                              int can_add = 1;
+                              // If this user also sent a friend request to the other user, the other user could accept it first
+                              // So we need to check if they are already friends
+
+                              // NO, BECAUSE IF THE OTHER USER ACCEPTED THE FRIEND REQUEST FIRST, 
+                              // HE WOULD NOT HAVE A PENDING FRIEND REQUEST FROM THIS USER
+
+                              // If the other user is already a friend, display an error
+                              for(int f = 0; f < clients[i].friends_size; f++)
+                              {
+                                 if(clients[i].friends[f] == other_user->sock)
+                                 {
+                                    can_add = 0;
+                                    strncpy(buffer, "User is already a friend\n", BUF_SIZE - 1);
+                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                    break;
+                                 }
+                              }
+
+                              // If they are not friends, add them as friends
+                              if(can_add == 1)
+                              {
+                                 // Add the other user id into the user friends
+                                 clients[i].friends[clients[i].friends_size] = other_user->sock;
+                                 clients[i].friends_size++;
+
+                                 // Add the user id into the other user friends
+                                 other_user->friends[other_user->friends_size] = clients[i].sock;
+                                 other_user->friends_size++;
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "You are now friends with: ", BUF_SIZE - 1);
+                                 strncat(buffer, other_username, BUF_SIZE - strlen(buffer) - 1);
+                                 strncat(buffer, "\n", BUF_SIZE - strlen(buffer) - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 // Send a message to the other user
+                                 strncpy(buffer, clients[i].name, BUF_SIZE - 1);
+                                 strncpy(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
+                                 send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+                              }
+
+                              // Remove the friend request from the user
+                              for(int f = 0; f < clients[i].friend_requests_size; f++)
+                              {
+                                 if(clients[i].friend_requests[f] == other_user->sock)
+                                 {
+                                    // Remove the friend request in the user list
+                                    memmove(clients[i].friend_requests + f, clients[i].friend_requests + f + 1, (clients[i].friend_requests_size - f - 1) * sizeof(int));
+                                    clients[i].friend_requests_size--;
+                                    break;
+                                 }
+                              }
+
+                              // If this user also sent a friend request to the other user, remove the friend request in his list
+                              for(int f = 0; f < other_user->friend_requests_size; f++)
+                              {
+                                 if(other_user->friend_requests[f] == clients[i].sock)
+                                 {
+                                    // Remove the friend request in the other user list
+                                    memmove(other_user->friend_requests + f, other_user->friend_requests + f + 1, (other_user->friend_requests_size - f - 1) * sizeof(int));
+                                    other_user->friend_requests_size--;
+                                    break;
+                                 }
+                              }
+                           }
+                        }
+                     }
+                     
+                     else if(strcmp(buffer, "/list_friends") == 0)
+                     {
+                        printf("The user %s listed the friends\n", clients[i].name);
+
+                        strncpy(buffer, "List of friends:\n",                 BUF_SIZE - 1);
+                        for(int u = 0; u < clients[i].friends_size; u++)
+                        {
+                           Client* friend = get_client_by_id(clients, clients_size, clients[i].friends[u]);
+
+                           strncat(buffer, friend->name,                      BUF_SIZE - strlen(buffer) - 1);
+                           strncat(buffer, "\n",                              BUF_SIZE - strlen(buffer) - 1);
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
-                        strncpy(buffer, "Available commands\n",                                                                  BUF_SIZE - 1);
-                        strncat(buffer, "/list_users: list all the users connected\n",                                           BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/chat <<message>>: send a message to all users in the lobby or party\n",                BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/send <<username>> <<message>>: send a private message to an user\n",                   BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/create_party <<visibility>>: create a party. Visibility: 0 = public, 1 = private\n",   BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/list_parties: list all the parties\n",                                                 BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/join_party <<party_id>> <<mode>>: join a party. Mode: 0 = player, 1 = spectator\n",    BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/leave_party: leave the current party\n",                                               BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                          BUF_SIZE - strlen(buffer) - 1);
+                        strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
+                        strncat(buffer, "/list_users: list all the users connected\n",                                          BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/chat <<message>>: send a message to all users in the lobby or party\n",               BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/send <<username>> <<message>>: send a private message to an user\n",                  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/create_party <<visibility>>: create a party. Visibility: 0 = public, 1 = private\n",  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_parties: list all the parties\n",                                                BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/join_party <<party_id>> <<mode>>: join a party. Mode: 0 = player, 1 = spectator\n",   BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/leave_party: leave the current party\n",                                              BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                         BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/accept_friend <<username>>: accept a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_friends: list all the friends\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
