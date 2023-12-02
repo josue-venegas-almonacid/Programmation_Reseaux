@@ -183,7 +183,7 @@ static void app(void)
                // Client disconnected
                if(c == 0)
                {
-                  printf("The user %s disconnected\n", clients[i].name);
+                  printf("The user %s has disconnected\n", clients[i].name);
 
                   // TODO: If the client is in a game, stop it, leave the party and send a message to the other players
 
@@ -207,7 +207,7 @@ static void app(void)
                   {
                      if(strcmp(buffer, "/list_users") == 0)
                      {
-                        printf("The user %s listed the users\n", clients[i].name);
+                        printf("The user %s tried to list the users\n", clients[i].name);
 
                         strncpy(buffer, "List of users:\n",             BUF_SIZE - 1);
                         for(int u = 0; u < clients_size; u++)
@@ -229,7 +229,7 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %[^\n]", command, message) == 2 && strncmp(command, "/chat", strlen("/chat")) == 0)
                      {
-                        printf("The user %s sent a message to the room %d\n", clients[i].name, clients[i].room_id);
+                        printf("The user %s tried to send a message to the room %d\n", clients[i].name, clients[i].room_id);
                         
                         // Send the message to all the users in the room (lobby/party)
                         broadcast_message(clients, clients_size, clients[i].sock, clients[i].room_id, message, blue);
@@ -237,7 +237,7 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %s %[^\n]", command, other_username, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0)
                      {
-                        printf("The user %s sent a message to %s\n", clients[i].name, other_username);
+                        printf("The user %s tried to send a message to %s\n", clients[i].name, other_username);
 
                         // The user can not send a message to himself
                         if(strcmp(clients[i].name, other_username) == 0){
@@ -285,7 +285,7 @@ static void app(void)
                            // Check if the party visibility is valid
                            if(party_visibility == 0)
                            {
-                              printf("The user %s created a public party\n", clients[i].name);
+                              printf("The user %s tried to create a public party\n", clients[i].name);
 
                               /**
                                * PUT THE CODE HERE TO CREATE A PUBLIC PARTY
@@ -347,7 +347,7 @@ static void app(void)
 
                      else if(strcmp(buffer, "/list_parties") == 0)
                      {
-                        printf("The user %s listed the parties\n", clients[i].name);
+                        printf("The user %s tried to list the parties\n", clients[i].name);
 
                         // TODO: Display the owner, visibility, players and spectators of each party
 
@@ -413,7 +413,7 @@ static void app(void)
                                  // Check if the party is public
                                  if(party->mode == 0)
                                  {
-                                    printf("The user %s joined the party %d in mode: %d\n", clients[i].name, party->id, join_mode);
+                                    printf("The user %s tried to joined the party %d in mode: %d\n", clients[i].name, party->id, join_mode);
 
                                     // If join mode is 0, the user is joining as a player
                                     // If join mode is 1, the user is joining as a spectator
@@ -452,7 +452,7 @@ static void app(void)
 
                      else if(strcmp(buffer, "/leave_party") == 0)
                      {
-                        printf("The user %s left the party %d\n", clients[i].name, clients[i].room_id);
+                        printf("The user %s tried to left the party %d\n", clients[i].name, clients[i].room_id);
                         // Check if the user is in a party
                         if(clients[i].room_id == -1)
                         {
@@ -476,7 +476,7 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/add_friend", strlen("/add_friend")) == 0)
                      {
-                        printf("The user %s sent a friend request to %s\n", clients[i].name, other_username);
+                        printf("The user %s tried to send a friend request to %s\n", clients[i].name, other_username);
 
                         // The user can not add himself as a friend
                         if(strcmp(clients[i].name, other_username) == 0){
@@ -543,7 +543,7 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_friend", strlen("/accept_friend")) == 0)
                      {
-                        printf("The user %s accepted a friend request from %s\n", clients[i].name, other_username);
+                        printf("The user %s tried to accepted a friend request from %s\n", clients[i].name, other_username);
 
                         // Check if the user has a pending friend request
                         if(clients[i].friend_requests_size == 0)
@@ -628,7 +628,7 @@ static void app(void)
                      
                      else if(strcmp(buffer, "/list_friends") == 0)
                      {
-                        printf("The user %s listed the friends\n", clients[i].name);
+                        printf("The user %s tried to list the friends\n", clients[i].name);
 
                         strncpy(buffer, "List of friends:\n",                 BUF_SIZE - 1);
                         for(int u = 0; u < clients[i].friends_size; u++)
