@@ -3,7 +3,7 @@
  * - Add bio
  * - Delete friends.
  * - List friend requests, so the user can check if was disconnected and he has pending friend requests
- * - Send challenges requests, list challenges requests, accept challenges, decline challenges
+ * - Send challenges, list challenges, accept challenges, decline challenges
  * - Create a function to give a party id (follow the same logic as the client id)
  * 
  * ASSIGNED TO hichem:
