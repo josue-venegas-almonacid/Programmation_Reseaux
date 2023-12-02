@@ -580,47 +580,13 @@ static void app(void)
                            // If the user has a pending friend request from the other user, try to add him
                            else if(found == 1)
                            {
-                              int can_add = 1;
-                              // If this user also sent a friend request to the other user, the other user could accept it first
-                              // So we need to check if they are already friends
+                              // Add the other user id into the user friends
+                              clients[i].friends[clients[i].friends_size] = other_user->sock;
+                              clients[i].friends_size++;
 
-                              // NO, BECAUSE IF THE OTHER USER ACCEPTED THE FRIEND REQUEST FIRST, 
-                              // HE WOULD NOT HAVE A PENDING FRIEND REQUEST FROM THIS USER
-
-                              // If the other user is already a friend, display an error
-                              for(int f = 0; f < clients[i].friends_size; f++)
-                              {
-                                 if(clients[i].friends[f] == other_user->sock)
-                                 {
-                                    can_add = 0;
-                                    strncpy(buffer, "User is already a friend\n", BUF_SIZE - 1);
-                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
-                                    break;
-                                 }
-                              }
-
-                              // If they are not friends, add them as friends
-                              if(can_add == 1)
-                              {
-                                 // Add the other user id into the user friends
-                                 clients[i].friends[clients[i].friends_size] = other_user->sock;
-                                 clients[i].friends_size++;
-
-                                 // Add the user id into the other user friends
-                                 other_user->friends[other_user->friends_size] = clients[i].sock;
-                                 other_user->friends_size++;
-
-                                 // Send a message to the user
-                                 strncpy(buffer, "You are now friends with: ", BUF_SIZE - 1);
-                                 strncat(buffer, other_username, BUF_SIZE - strlen(buffer) - 1);
-                                 strncat(buffer, "\n", BUF_SIZE - strlen(buffer) - 1);
-                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
-
-                                 // Send a message to the other user
-                                 strncpy(buffer, clients[i].name, BUF_SIZE - 1);
-                                 strncpy(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
-                                 send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
-                              }
+                              // Add the user id into the other user friends
+                              other_user->friends[other_user->friends_size] = clients[i].sock;
+                              other_user->friends_size++;
 
                               // Remove the friend request from the user
                               for(int f = 0; f < clients[i].friend_requests_size; f++)
@@ -645,6 +611,17 @@ static void app(void)
                                     break;
                                  }
                               }
+
+                              // Send a message to the user
+                              strncpy(buffer, "You are now friends with: ", BUF_SIZE - 1);
+                              strncat(buffer, other_username, BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, "\n", BUF_SIZE - strlen(buffer) - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                              // Send a message to the other user
+                              strncpy(buffer, clients[i].name, BUF_SIZE - 1);
+                              strncpy(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
+                              send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
                            }
                         }
                      }
