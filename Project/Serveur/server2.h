@@ -51,20 +51,20 @@ typedef struct
    // ID of the spectators
    int spectators[MAX_CLIENTS];
 
-   // change the above structure and save everyone in a list
+   // TODO: change the above structure and save everyone in a list
 
    // Number of spectators
    int spectators_size;
 
    // Party mode
-   // 0 = private
-   // 1 = public
+   // 0 = public
+   // 1 = private
    int mode;
 
    // Game
    Awale* game;
 
-   // Delete this
+   // TODO: delete this. It should be in the game structure
    int turn;
 }Party;
 
