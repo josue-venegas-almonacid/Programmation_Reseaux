@@ -879,6 +879,20 @@ static void app(void)
                         }
                      }
 
+                     else if(strcmp(buffer, "/list_challenges") == 0)
+                     {
+                        printf("The user %s tried to list the challenges\n", clients[i].name);
+
+                        strncpy(buffer, "List of challenges:\n",                 BUF_SIZE - 1);
+                        for(int u = 0; u < clients[i].challengers_size; u++)
+                        {
+                           Client* challenger = get_client_by_id(clients, clients_size, clients[i].challengers[u]);
+
+                           strncat(buffer, challenger->name,                      BUF_SIZE - strlen(buffer) - 1);
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
@@ -897,6 +911,7 @@ static void app(void)
                         strncat(buffer, "/list_friends: list all the friends\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/delete_friend <<username>>: delete a friend\n",                                       BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/challenge <<username>>: challenge an user\n",                                         BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_challenges: list all the challenges\n",                                          BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
