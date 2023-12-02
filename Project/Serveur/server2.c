@@ -9,9 +9,10 @@
  * - Save a finished game
  * - Replay a saved game
  * 
- * ASSIGNED TO josue and hichem:
  * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
  * - Check cases when the user leaves a party and the game has started
+ * 
+ *  * ASSIGNED TO josue and hichem:
  * - Check cases when the user disconnects and he is in a party and the game has started
  * 
  * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
@@ -801,6 +802,87 @@ static void app(void)
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
                      }
 
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/challenge", strlen("/challenge")) == 0)
+                     {
+                        printf("The user %s tried to challenge %s\n", clients[i].name, other_username);
+
+                        // The user can not challenge himself
+                        if(strcmp(clients[i].name, other_username) == 0){
+                           strncpy(buffer, "You can not challenge yourself\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           // If the user is in a party and is not the owner, display an error
+                           Party *party = get_party_by_id(parties, parties_size, clients[i].party_id);
+
+                           if(clients[i].party_id != -1 && party->player_one != clients[i].sock)
+                           {
+                              strncpy(buffer, "You can not challenge someone while you are in another's party\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+
+                           else
+                           {
+                              // Check if the user exists
+                              Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                              if (other_user == NULL)
+                              {
+                                 strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }
+
+                              else
+                              {
+                                 // Check if the user is already in a party
+                                 if(other_user->party_id != -1)
+                                 {
+                                    strncpy(buffer, "User is already in a party\n", BUF_SIZE - 1);
+                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                 }
+
+                                 else
+                                 {
+                                    // Check if the user is already in the list of challengers
+                                    int found = 0;
+                                    for(int c = 0; c < other_user->challengers_size; c++)
+                                    {
+                                       if(other_user->challengers[c] == clients[i].id)
+                                       {
+                                          found = 1;
+                                          break;
+                                       }
+                                    }
+
+                                    // If the user is already in the list of challengers, display an error
+                                    if(found == 1)
+                                    {
+                                       strncpy(buffer, "You have already challenged this user\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                    }
+
+                                    else
+                                    {
+                                       // Add the user to the list of challengers
+                                       other_user->challengers[other_user->challengers_size] = clients[i].id;
+                                       other_user->challengers_size++;
+
+                                       // Send a message to the user
+                                       strncpy(buffer, "You have a new challenge from: ", BUF_SIZE - 1);
+                                       strncat(buffer, clients[i].name, BUF_SIZE - strlen(buffer) - 1);
+                                       send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+
+                                       strncpy(buffer, "Challenge sent\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                                    }
+                                 }
+                              }
+                           }
+                        }
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
@@ -818,6 +900,7 @@ static void app(void)
                         strncat(buffer, "/accept_friend <<username>>: accept a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_friends: list all the friends\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/delete_friend <<username>>: delete a friend\n",                                       BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/challenge <<username>>: challenge an user\n",                                         BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
