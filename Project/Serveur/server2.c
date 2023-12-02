@@ -1,7 +1,5 @@
 /** TODO: 
  * ASSIGNED TO josue:
- * - Delete friends.
- * - List friend requests, so the user can check if was disconnected and he has pending friend requests
  * - Send challenges, list challenges, accept challenges, decline challenges
  * - Create a function to give a party id (follow the same logic as the client id)
  * 
@@ -171,6 +169,11 @@ static void app(void)
             client->sock = csock;
 
             printf("User connected as %s with ID %i and socket %i\n", client->name, client->id, client->sock);
+
+            // Send a message to all the users in the lobby
+            strncpy(buffer, client->name, BUF_SIZE - 1);
+            strncat(buffer, " connected !", BUF_SIZE - strlen(buffer) - 1);
+            broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
          }
 
          // If the user does not exist, create a new user
@@ -590,6 +593,19 @@ static void app(void)
                         }
                      }
 
+                     else if(strcmp(buffer, "/list_friend_requests") == 0)
+                     {
+                        printf("The user %s tried to list the friend requests\n", clients[i].name);
+
+                        strncpy(buffer, "List of friend requests:\n",         BUF_SIZE - 1);
+                        for(int u = 0; u < clients[i].friend_requests_size; u++)
+                        {
+                           Client* friend = get_client_by_id(clients, clients_size, clients[i].friend_requests[u]);
+                           strncat(buffer, friend->name,                      BUF_SIZE - strlen(buffer) - 1);
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
                      else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_friend", strlen("/accept_friend")) == 0)
                      {
                         printf("The user %s tried to accepted a friend request from %s\n", clients[i].name, other_username);
@@ -706,6 +722,8 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/delete_friend", strlen("/delete_friend")) == 0)
                      {
+                        printf("The user %s tried to delete a friend: %s\n", clients[i].name, other_username);
+
                         // Try to delete the friend
                         Client* other_user = get_client_by_username(clients, clients_size, other_username);
 
@@ -796,6 +814,7 @@ static void app(void)
                         strncat(buffer, "/join_party <<party_id>> <<mode>>: join a party. Mode: 0 = player, 1 = spectator\n",   BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/leave_party: leave the current party\n",                                              BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                         BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_friend_requests: list all the friend requests\n",                                BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/accept_friend <<username>>: accept a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_friends: list all the friends\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/delete_friend <<username>>: delete a friend\n",                                       BUF_SIZE - strlen(buffer) - 1);
