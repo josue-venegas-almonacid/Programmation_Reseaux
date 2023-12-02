@@ -1,6 +1,6 @@
 /** TODO: 
  * ASSIGNED TO josue:
- * - Send challenges, list challenges, accept challenges, decline challenges
+ * - Decline challenges
  * - Create a function to give a party id (follow the same logic as the client id)
  * 
  * ASSIGNED TO hichem:
@@ -225,6 +225,10 @@ static void app(void)
 
                   // TODO: If the client is in a game, stop it, leave the party and send a message to the other players
 
+                  // Send the player to the lobby
+                  clients[i].party_id = -1;
+
+                  // Close the socket
                   closesocket(clients[i].sock);
                   clients[i].sock = -1;
 
@@ -609,7 +613,7 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_friend", strlen("/accept_friend")) == 0)
                      {
-                        printf("The user %s tried to accepted a friend request from %s\n", clients[i].name, other_username);
+                        printf("The user %s tried to accept a friend request from %s\n", clients[i].name, other_username);
 
                         // Check if the user exists
                         Client* other_user = get_client_by_username(clients, clients_size, other_username);
@@ -806,12 +810,9 @@ static void app(void)
 
                         else
                         {
-                           // If the user is in a party and is not the owner, display an error
-                           Party *party = get_party_by_id(parties, parties_size, clients[i].party_id);
-
-                           if(clients[i].party_id != -1 && party->player_one != clients[i].sock)
+                           if(clients[i].party_id != -1)
                            {
-                              strncpy(buffer, "You can not challenge someone while you are in another's party\n", BUF_SIZE - 1);
+                              strncpy(buffer, "You can not challenge someone while you are in a party\n", BUF_SIZE - 1);
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                            }
 
@@ -866,12 +867,13 @@ static void app(void)
                                        other_user->challengers_size++;
 
                                        // Send a message to the user
+                                       strncpy(buffer, "Challenge sent\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                       // Send a message to the other user
                                        strncpy(buffer, "You have a new challenge from: ", BUF_SIZE - 1);
                                        strncat(buffer, clients[i].name, BUF_SIZE - strlen(buffer) - 1);
                                        send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
-
-                                       strncpy(buffer, "Challenge sent\n", BUF_SIZE - 1);
-                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
                                     }
                                  }
                               }
@@ -893,6 +895,92 @@ static void app(void)
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
 
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_challenge", strlen("/accept_challenge")) == 0)
+                     {
+                        printf("The user %s tried to accept a challenge from %s\n", clients[i].name, other_username);
+
+                        if(clients[i].party_id != -1)
+                        {
+                           strncpy(buffer, "You can not accept a challenge while you are in a party\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           // Check if the user exists
+                           Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                           // If the user does not exist, display an error
+                           if(other_user == NULL)
+                           {
+                              strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+
+                           // If the user exists, try to accept the challenge
+                           else
+                           {
+                              int found = 0;
+                              for(int f = 0; f < clients[i].challengers_size; f++)
+                              {
+                                 // If the user has a pending challenge from the other user, try to accept it
+                                 if(clients[i].challengers[f] == other_user->id)
+                                 {
+                                    found = 1;
+
+                                    // If the user who sent the challenge is in a party, display an error
+                                    if(other_user->party_id != -1)
+                                    {
+                                       strncpy(buffer, "User is already in a party\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                    }
+
+                                    // If the user who sent the challenge is not in a party, accept the challenge
+                                    else
+                                    {
+                                       // Remove the challenge from the user list
+                                       memmove(clients[i].challengers + f, clients[i].challengers + f + 1, (clients[i].challengers_size - f - 1) * sizeof(int));
+                                       clients[i].challengers_size--;
+
+                                       // If this user also sent a challenge to the other user, remove that challenge in his list
+                                       for(int c = 0; c < other_user->challengers_size; c++)
+                                       {
+                                          if(other_user->challengers[c] == clients[i].id)
+                                          {
+                                             // Remove the challenge in the other user list
+                                             memmove(other_user->challengers + c, other_user->challengers + c + 1, (other_user->challengers_size - c - 1) * sizeof(int));
+                                             other_user->challengers_size--;
+                                             break;
+                                          }
+                                       }
+
+                                       // Send a message to the user
+                                       strncpy(buffer, "Challenge accepted\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                       // Send a message to the other user
+                                       strncpy(buffer, clients[i].name, BUF_SIZE - 1);
+                                       strncat(buffer, " has accepted your challenge\n", BUF_SIZE - strlen(buffer) - 1);
+                                       send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+
+                                       // TODO: Create a new party with the challenger and the challenged
+                                       // TODO: Since both players are in the party, start the game
+                                    }
+
+                                    break;
+                                 }
+                              }
+
+                              // If the user does not have a pending challenge from the other user, display an error
+                              if(found == 0)
+                              {
+                                 strncpy(buffer, "You don't have a pending challenge from this user\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }  
+                           }
+                        }
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
@@ -912,6 +1000,7 @@ static void app(void)
                         strncat(buffer, "/delete_friend <<username>>: delete a friend\n",                                       BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/challenge <<username>>: challenge an user\n",                                         BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_challenges: list all the challenges\n",                                          BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/accept_challenge <<username>>: accept a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
