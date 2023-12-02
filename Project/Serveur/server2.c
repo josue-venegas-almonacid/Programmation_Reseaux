@@ -611,82 +611,69 @@ static void app(void)
                      {
                         printf("The user %s tried to accepted a friend request from %s\n", clients[i].name, other_username);
 
-                        // Check if the user has a pending friend request
-                        if(clients[i].friend_requests_size == 0)
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        // If the user does not exist, display an error
+                        if(other_user == NULL)
                         {
-                           strncpy(buffer, "You don't have any pending friend requests\n", BUF_SIZE - 1);
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
 
+                        // If the user exists, try to accept the friend request
                         else
                         {
-                           // Check if the user has a pending friend request from the other user
                            int found = 0;
-                           Client* other_user = get_client_by_username(clients, clients_size, other_username);
-
-                           if(other_user != NULL)
+                           for(int f = 0; f < clients[i].friend_requests_size; f++)
                            {
-                              for(int f = 0; f < clients[i].friend_requests_size; f++)
+                              // If the user has a pending friend request from the other user, accept it
+                              if(clients[i].friend_requests[f] == other_user->id)
                               {
-                                 if(clients[i].friend_requests[f] == other_user->id)
+                                 // Add the other user id into the user friends
+                                 clients[i].friends[clients[i].friends_size] = other_user->id;
+                                 clients[i].friends_size++;
+
+                                 // Add the user id into the other user friends
+                                 other_user->friends[other_user->friends_size] = clients[i].id;
+                                 other_user->friends_size++;
+
+                                 // Remove the friend request from the user list
+                                 memmove(clients[i].friend_requests + f, clients[i].friend_requests + f + 1, (clients[i].friend_requests_size - f - 1) * sizeof(int));
+                                 clients[i].friend_requests_size--;
+
+                                 // If this user also sent a friend request to the other user, remove that friend request in his list
+                                 for(int f = 0; f < other_user->friend_requests_size; f++)
                                  {
-                                    found = 1;
-                                    break;
+                                    if(other_user->friend_requests[f] == clients[i].id)
+                                    {
+                                       // Remove the friend request in the other user list
+                                       memmove(other_user->friend_requests + f, other_user->friend_requests + f + 1, (other_user->friend_requests_size - f - 1) * sizeof(int));
+                                       other_user->friend_requests_size--;
+                                       break;
+                                    }
                                  }
-                              }  
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Friend request accepted\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 // Send a message to the other user
+                                 strncpy(buffer, clients[i].name, BUF_SIZE - 1);
+                                 strncat(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
+                                 send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+
+                                 found = 1;
+                                 break;
+                              }
                            }
-                           
+
                            // If the user does not have a pending friend request from the other user, display an error
                            if(found == 0)
                            {
                               strncpy(buffer, "You don't have a pending friend request from this user\n", BUF_SIZE - 1);
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
-                           }
-
-                           // If the user has a pending friend request from the other user, try to add him
-                           else if(found == 1)
-                           {
-                              // Add the other user id into the user friends
-                              clients[i].friends[clients[i].friends_size] = other_user->id;
-                              clients[i].friends_size++;
-
-                              // Add the user id into the other user friends
-                              other_user->friends[other_user->friends_size] = clients[i].id;
-                              other_user->friends_size++;
-
-                              // Remove the friend request from the user
-                              for(int f = 0; f < clients[i].friend_requests_size; f++)
-                              {
-                                 if(clients[i].friend_requests[f] == other_user->id)
-                                 {
-                                    // Remove the friend request in the user list
-                                    memmove(clients[i].friend_requests + f, clients[i].friend_requests + f + 1, (clients[i].friend_requests_size - f - 1) * sizeof(int));
-                                    clients[i].friend_requests_size--;
-                                    break;
-                                 }
-                              }
-
-                              // If this user also sent a friend request to the other user, remove the friend request in his list
-                              for(int f = 0; f < other_user->friend_requests_size; f++)
-                              {
-                                 if(other_user->friend_requests[f] == clients[i].id)
-                                 {
-                                    // Remove the friend request in the other user list
-                                    memmove(other_user->friend_requests + f, other_user->friend_requests + f + 1, (other_user->friend_requests_size - f - 1) * sizeof(int));
-                                    other_user->friend_requests_size--;
-                                    break;
-                                 }
-                              }
-
-                              // Send a message to the user
-                              strncpy(buffer, "Friend request accepted\n", BUF_SIZE - 1);
-                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
-
-                              // Send a message to the other user
-                              strncpy(buffer, clients[i].name, BUF_SIZE - 1);
-                              strncat(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
-                              send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
-                           }
+                           }  
                         }
                      }
                      
@@ -725,48 +712,53 @@ static void app(void)
                      {
                         printf("The user %s tried to delete a friend: %s\n", clients[i].name, other_username);
 
-                        // Try to delete the friend
+                        // Check if the user exists
                         Client* other_user = get_client_by_username(clients, clients_size, other_username);
 
-                        int found = 0;
-                        for(int f = 0; f < clients[i].friends_size; f++)
+                        // If the user does not exist, display an error
+                        if (other_user == NULL)
                         {
-                           if(clients[i].friends[f] == other_user->id)
-                           {
-                              memmove(clients[i].friends + f, clients[i].friends + f + 1, (clients[i].friends_size - f - 1) * sizeof(int));
-                              clients[i].friends_size--;
-
-                              found = 1;
-                              break;
-                           }
-                        }
-
-                        // Try to delete the user from the other user friends
-                        if(found == 1)
-                        {
-                           for(int f = 0; f < other_user->friends_size; f++)
-                           {
-                              if(other_user->friends[f] == clients[i].id)
-                              {
-                                 memmove(other_user->friends + f, other_user->friends + f + 1, (other_user->friends_size - f - 1) * sizeof(int));
-                                 other_user->friends_size--;
-                                 break;
-                              }
-                           }
-                        }
-
-                        if(found == 0)
-                        {
-                           // If the user is not a friend, display an error
-                           strncpy(buffer, "User is not a friend\n", BUF_SIZE - 1);
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
 
+                        // If the user exists, try to delete him
                         else
                         {
-                           // Send a message to the user
-                           strncpy(buffer, "Friend deleted\n", BUF_SIZE - 1);
-                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                           int found = 0;
+                           for(int f = 0; f < clients[i].friends_size; f++)
+                           {
+                              if(clients[i].friends[f] == other_user->id)
+                              {
+                                 memmove(clients[i].friends + f, clients[i].friends + f + 1, (clients[i].friends_size - f - 1) * sizeof(int));
+                                 clients[i].friends_size--;
+
+                                 // Try to delete this user from the other user friends
+                                 for(int f = 0; f < other_user->friends_size; f++)
+                                 {
+                                    if(other_user->friends[f] == clients[i].id)
+                                    {
+                                       memmove(other_user->friends + f, other_user->friends + f + 1, (other_user->friends_size - f - 1) * sizeof(int));
+                                       other_user->friends_size--;
+                                       break;
+                                    }
+                                 }
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Friend deleted\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 found = 1;
+                                 break;
+                              }
+                           }
+
+                           if(found == 0)
+                           {
+                              // If the user is not a friend, display an error
+                              strncpy(buffer, "User is not a friend\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
                         }
                      }
                      
@@ -836,8 +828,15 @@ static void app(void)
 
                               else
                               {
-                                 // Check if the user is already in a party
-                                 if(other_user->party_id != -1)
+                                 // If the user is disconnected, display an error
+                                 if(other_user->sock == -1)
+                                 {
+                                    strncpy(buffer, "User is disconnected\n", BUF_SIZE - 1);
+                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                 }
+
+                                 // If the user is already in a party, display an error
+                                 else if(other_user->party_id != -1)
                                  {
                                     strncpy(buffer, "User is already in a party\n", BUF_SIZE - 1);
                                     send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -845,25 +844,22 @@ static void app(void)
 
                                  else
                                  {
-                                    // Check if the user is already in the list of challengers
+                                    // If the user is already in the list of challengers, display an error
                                     int found = 0;
                                     for(int c = 0; c < other_user->challengers_size; c++)
                                     {
                                        if(other_user->challengers[c] == clients[i].id)
                                        {
+                                          strncpy(buffer, "You have already challenged this user\n", BUF_SIZE - 1);
+                                          send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+
                                           found = 1;
                                           break;
                                        }
                                     }
 
-                                    // If the user is already in the list of challengers, display an error
-                                    if(found == 1)
-                                    {
-                                       strncpy(buffer, "You have already challenged this user\n", BUF_SIZE - 1);
-                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
-                                    }
-
-                                    else
+                                    // If the user is not in the list of challengers, send the challenge
+                                    if(found == 0)
                                     {
                                        // Add the user to the list of challengers
                                        other_user->challengers[other_user->challengers_size] = clients[i].id;
