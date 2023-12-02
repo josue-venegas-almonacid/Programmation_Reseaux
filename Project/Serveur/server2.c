@@ -21,7 +21,7 @@
  * - Add function signatures to the header files
  * 
  * 
- * 
+ * - (OPTIONAL) challenges: Should be remove the challenges if the user disconnects?
  * - (OPTIONAL) fix:       /send and /broadcasting. instead of iterating over all the clients, iterate over party members only
  * - (OPTIONAL) fix:       console. if the user is typing while a message is received, the message is not displayed correctly
  * - (OPTIONAL) fix:       console. improve the console interface for the client
@@ -928,8 +928,15 @@ static void app(void)
                                  {
                                     found = 1;
 
+                                    // If the user who sent the challenge is disconnected, display an error
+                                    if(other_user->sock == -1)
+                                    {
+                                       strncpy(buffer, "User is disconnected\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                    }
+
                                     // If the user who sent the challenge is in a party, display an error
-                                    if(other_user->party_id != -1)
+                                    else if(other_user->party_id != -1)
                                     {
                                        strncpy(buffer, "User is already in a party\n", BUF_SIZE - 1);
                                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
