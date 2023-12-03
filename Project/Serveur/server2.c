@@ -500,7 +500,17 @@ static void app(void)
                                        party->spectators_size++;
                                        clients[i].party_id = party->id;
                                        printf("User %s joined the party %d as a spectator\n", clients[i].name, clients[i].party_id);
-                                       broadcast_message(clients, clients_size, 0, clients[i].party_id, display(*game, party->player_one->name, party->player_two->name), blue);
+                                       // If game not started, send message to user to wait
+                                       if (party->status == 0)
+                                       {
+                                          strncpy(buffer, "Waiting for the second player to join\n", BUF_SIZE - 1);
+                                          send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                                       }
+                                       else
+                                       {
+                                          send_message_to_client(clients, clients_size, 0, clients[i].sock, display(*game, party->player_one->name, party->player_two->name), blue);
+                                       }
+                                       
                                     }
                                     
                                  }
