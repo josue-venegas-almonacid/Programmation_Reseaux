@@ -118,7 +118,7 @@ static void app(void)
       // Add the connection socket to the set
       FD_SET(sock, &rdfs);
 
-      // Add socket of each client to the set
+      // Add socket of each connected client to the set
       for(int s = 0; s < clients_size; s++)
       {
          if(clients[s].sock != -1) FD_SET(clients[s].sock, &rdfs);
@@ -137,7 +137,7 @@ static void app(void)
       // New client
       else if(FD_ISSET(sock, &rdfs))
       {
-         printf("New client trying to connect...\n");
+         printf("New client\n");
          SOCKADDR_IN csin = { 0 };
          uid_t sinsize = sizeof csin;
 
@@ -222,9 +222,8 @@ static void app(void)
          {
             if(FD_ISSET(clients[i].sock, &rdfs))
             {
-               int client_id = clients[i].sock;
                
-               int c = read_client(client_id, buffer);
+               int c = read_client(clients[i].sock, buffer);
 
                // Client disconnected
                if(c == 0)
@@ -238,7 +237,7 @@ static void app(void)
 
                   // Change the player replay party id to -1
                   clients[i].replay_party_id = -1;
-
+                 
                   // Close the socket
                   closesocket(clients[i].sock);
                   clients[i].sock = -1;
@@ -378,8 +377,8 @@ static void app(void)
                            parties[parties_size] = party;
                            parties_size++;
 
-                              // Join the party
-                              // Save the party id to the client room attribute
+                           // Join the party
+                           // Save the party id to the client room attribute
                            clients[i].party_id = party.id;
 
                            // Display party to the player
@@ -552,7 +551,6 @@ static void app(void)
                         else
                         {
                            // Save the lobby id to the client room attribute
-                           party = get_party_by_id(parties, parties_size, clients[i].party_id);
                            clients[i].party_id = -1;
 
                            // Send a message to the user
@@ -1085,12 +1083,11 @@ static void app(void)
                                        broadcast_message(clients, clients_size, 0, clients[i].party_id, display(*game, party->player_one->name, party->player_two->name), blue);
                                  
                                     } 
-                              
+
 
                                     break;
                                  }
                               }
-                           
 
                               // If the user does not have a pending challenge from the other user, display an error
                               if(found == 0)
