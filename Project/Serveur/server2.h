@@ -76,6 +76,7 @@ static void init(void);
 static void end(void);
 static void app(void);
 
+int compare_ranking(const void *a, const void *b);
 int user_exists(Client* clients, int clients_size, char* username);
 Client* get_client_by_id(Client *clients, int clients_size, int client_id);
 Client* get_client_by_username(Client *clients, int clients_size, char* username);
