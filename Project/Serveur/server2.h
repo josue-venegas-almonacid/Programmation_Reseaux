@@ -43,10 +43,10 @@ typedef struct
    int id;
 
    // ID of the player one
-   int player_one;
+   Client* player_one;
 
    // ID of the player two
-   int player_two;
+   Client* player_two;
 
    // ID of the spectators
    int spectators[MAX_CLIENTS];
@@ -63,9 +63,12 @@ typedef struct
 
    // Game
    Awale* game;
-
-   // TODO: delete this. It should be in the game structure
+   int game_started;
    int turn;
+
+   // Replay
+   char replay[100][BUF_SIZE];
+   int replay_size;
 }Party;
 
 // List of functions
@@ -78,13 +81,11 @@ int user_exists(Client* clients, int clients_size, char* username);
 Client* get_client_by_id(Client *clients, int clients_size, int client_id);
 Client* get_client_by_username(Client *clients, int clients_size, char* username);
 Party*  get_party_by_id(Party *parties, int parties_size, int party_id);
+int is_friend(Client* client, Client* friend);
+int getRandomValue(int val1, int val2);
 
 void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color);
 void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color);
-
-static void old_create_party(Client *clients, int clients_size, int owner_id, Awale* game);
-static void old_create_game();
-static void old_play_game(Party party, Awale* game, int client_id, char* buffer, int move, char* errorMessage);
 
 static void clear_clients(Client *clients, int clients_size);
 static void remove_client(Client *clients, int to_remove, int *clients_size);
@@ -92,6 +93,7 @@ static int init_connection(void);
 static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
+
 
 
 #endif /* guard */
