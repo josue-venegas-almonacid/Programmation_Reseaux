@@ -1250,6 +1250,11 @@ static void app(void)
                            strncpy(party->replay[party->replay_size], display_winner(*game, party->player_one->name, party->player_two->name), BUF_SIZE - 1);
                            party->replay_size++;
                            broadcast_message(clients, clients_size, 0, clients[i].party_id, display_winner(*game, party->player_one->name, party->player_two->name), blue);
+                           if (game.score_one > game.score_two)
+                              party->player_one->ranking++;
+                           else if (game.score_one < game.score_two)
+                              party->player_two->ranking++;
+                              
                         } 
                         
                      }

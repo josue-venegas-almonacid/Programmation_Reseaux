@@ -38,6 +38,9 @@ typedef struct
    // Replay data
    int replay_party_id;
    int replay_position;
+
+   // Client ranking
+   int ranking;
 }Client;
 
 #endif /* guard */
