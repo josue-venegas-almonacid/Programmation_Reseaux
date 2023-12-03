@@ -345,7 +345,7 @@ static void app(void)
                                  spectators_size: 0,
                                  mode: party_visibility,
                                  game: game,
-                                 game_started: 0,
+                                 status: 0,
                                  turn: clients[i].sock
                               };
                               
@@ -1064,7 +1064,7 @@ static void app(void)
                                              spectators_size: 0,
                                              mode: 0,
                                              game: game,
-                                             game_started: 0,
+                                             status: 0,
                                              turn: 0
                                           };
 
@@ -1078,7 +1078,7 @@ static void app(void)
                                           other_user->party_id = party->id;
                                           
                                           game = party->game;
-                                          party->game_started = 1;
+                                          party->status = 1;
                                           party->turn = getRandomValue(party->player_one->sock, party->player_two->sock);
                                           // Print turn
                                           printf("The turn is %d\n", party->turn);
