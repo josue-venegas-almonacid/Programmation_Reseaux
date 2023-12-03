@@ -65,6 +65,10 @@ typedef struct
    Awale* game;
    int game_started;
    int turn;
+
+   // Replay
+   char replay[100][BUF_SIZE];
+   int replay_size;
 }Party;
 
 // List of functions

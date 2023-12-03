@@ -195,7 +195,9 @@ static void app(void)
                challengers: { 0 },
                challengers_size: 0,
                friends: { 0 },
-               friends_size: 0
+               friends_size: 0,
+               replay_party_id: -1,
+               replay_position: 0
             };
 
             strncpy(client.name, buffer, BUF_SIZE - 1);
@@ -233,6 +235,9 @@ static void app(void)
 
                   // Change the player party id to the lobby
                   clients[i].party_id = -1;
+
+                  // Change the player replay party id to -1
+                  clients[i].replay_party_id = -1;
 
                   // Close the socket
                   closesocket(clients[i].sock);
@@ -382,7 +387,40 @@ static void app(void)
                         }
 
                      }
-
+                     // Replay party
+                     else if(sscanf(buffer, "%s %s", command, message) == 2 && strncmp(command, "/replay_party", strlen("/replay_party")) == 0)
+                     {
+                        // Check if the user is in a party already
+                        if(clients[i].party_id != -1)
+                        {
+                           strncpy(buffer, "You are already in a party\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+                        else
+                        {
+                           int party_id = atoi(message);
+                           // Check if the party exists
+                           party = get_party_by_id(parties, parties_size, party_id);
+                           if(party == NULL)
+                           {
+                              strncpy(buffer, "Party not found\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+                           else
+                           {
+                              clients[i].replay_party_id = party->id;
+                              clients[i].replay_position = 0;
+                              clients[i].party_id = -2;
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, party->replay[clients[i].replay_position++], blue);
+                              if (clients[i].replay_position == party->replay_size)
+                              {
+                                 clients[i].replay_position = 0;
+                                 clients[i].replay_party_id = -1;
+                              }
+                               
+                           }
+                        }
+                     }
                      else if(strcmp(buffer, "/list_parties") == 0)
                      {
                         printf("The user %s tried to list the parties\n", clients[i].name);
@@ -514,11 +552,13 @@ static void app(void)
                         else
                         {
                            // Save the lobby id to the client room attribute
+                           party = get_party_by_id(parties, parties_size, clients[i].party_id);
                            clients[i].party_id = -1;
 
                            // Send a message to the user
                            strncpy(buffer, "You left the party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+
                         }
                      }
 
@@ -1133,6 +1173,7 @@ static void app(void)
                         strncat(buffer, "/list_challenges: list all the challenges\n",                                          BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/accept_challenge <<username>>: accept a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/reject_challenge <<username>>: reject a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/replay_party <<party_id>>: replay a party\n",                                         BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
@@ -1151,6 +1192,18 @@ static void app(void)
                      // if the user is in the lobby, he can only chat
                      if(clients[i].party_id == -1)
                         broadcast_message(clients, clients_size, clients[i].id, clients[i].party_id, buffer, blue);
+                     else if(clients[i].party_id == -2)
+                     {
+                        party = get_party_by_id(parties, parties_size, clients[i].replay_party_id);
+                        int replay_position = clients[i].replay_position;
+                        clients[i].replay_position++;
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, party->replay[replay_position], blue);
+                        if (clients[i].replay_position == party->replay_size)
+                        {
+                           clients[i].replay_position = 0;
+                           clients[i].replay_party_id = -1;
+                        }
+                     }
                      else
                      {
                         party = get_party_by_id(parties, parties_size, clients[i].party_id);
@@ -1162,6 +1215,10 @@ static void app(void)
                            write_client(clients[i].sock, buffer);
                         }
                         else if ( !game->finished && clients[i].sock == party->turn) {
+
+                           // Add move to replay
+                           strncpy(party->replay[party->replay_size], display(*game, party->player_one->name, party->player_two->name), BUF_SIZE - 1);
+                           party->replay_size++;
                            
                            move = atoi(buffer);
                            if (check_move(game, game->turn, move, message)) {
@@ -1170,7 +1227,7 @@ static void app(void)
                            }
 
                            broadcast_message(clients, clients_size, 0, clients[i].party_id, display(*game, party->player_one->name, party->player_two->name), blue);
-                           
+
                            if (is_game_over(game))
                               game->finished = 1;
                            
@@ -1189,6 +1246,9 @@ static void app(void)
                         else {
                            // Finish the game and display the winner
                            finish_game(game);
+                           // Add end to replay
+                           strncpy(party->replay[party->replay_size], display_winner(*game, party->player_one->name, party->player_two->name), BUF_SIZE - 1);
+                           party->replay_size++;
                            broadcast_message(clients, clients_size, 0, clients[i].party_id, display_winner(*game, party->player_one->name, party->player_two->name), blue);
                         } 
                         

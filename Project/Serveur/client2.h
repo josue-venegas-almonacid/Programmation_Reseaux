@@ -14,6 +14,7 @@ typedef struct
    // Id of the room where the client is
    // -1 if the client is in the lobby
    // party_id if the client is in a party
+   // -2 if the client is in the replay room
    int party_id;
 
    // Client's name
@@ -33,6 +34,10 @@ typedef struct
    // List of friends
    int friends[MAX_CLIENTS];
    int friends_size;
+
+   // Replay data
+   int replay_party_id;
+   int replay_position;
 }Client;
 
 #endif /* guard */
