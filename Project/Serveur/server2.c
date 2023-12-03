@@ -1,33 +1,21 @@
 /** TODO: 
- * ASSIGNED TO josue:
- * - Create a function to give a party id (follow the same logic as the client id)
- * 
- * ASSIGNED TO hichem:
- * - Create a party
- * - Start a game
- * - Save a finished game
- * - Replay a saved game
+ * - Since we are not deleting the parties, what happens if the game has finished and someone whants to join in the party?
+ * - If the game has started, can i join as a spectator?
+ * - Should we remove the challenges sent if the user disconnects? The other user can accept them if he is online
+ * - Should we remove the another challenges if the user accepts one challenge?
  * 
  * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
  * - Check cases when the user leaves a party and the game has started
- * 
- *  * ASSIGNED TO josue and hichem:
  * - Check cases when the user disconnects and he is in a party and the game has started
  * 
  * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
- * - Implement fork() to handle multiple games at the same time
- * - Add ranking
  * - Add function signatures to the header files
  * 
  * 
- * - (OPTIONAL) challenges: Should be removed the challenges if the user disconnects?
- * - (OPTIONAL) challenges: Should be removed the another challenges if the user accepts one challenge?
  * - (OPTIONAL) fix:       /send and /broadcasting. instead of iterating over all the clients, iterate over party members only
  * - (OPTIONAL) fix:       console. if the user receives a message while is typing, the typed message should be deleted
  * - (OPTIONAL) fix:       console. improve the console interface for the client
- * - (OPTIONAL) feature:   console. display the /help commands depending on the context (lobby, party, game)
- * - (OPTIONAL) feature:   sockets. if an user wants to connect with the same username, disconnect the previous user
-*/
+ **/
 
 /* Libraries */
 #include <stdio.h>
@@ -197,7 +185,8 @@ static void app(void)
                friends: { 0 },
                friends_size: 0,
                replay_party_id: -1,
-               replay_position: 0
+               replay_position: 0,
+               ranking: 0
             };
 
             strncpy(client.name, buffer, BUF_SIZE - 1);
@@ -237,6 +226,7 @@ static void app(void)
 
                   // Change the player replay party id to -1
                   clients[i].replay_party_id = -1;
+                  clients[i].replay_position = 0;
                  
                   // Close the socket
                   closesocket(clients[i].sock);
@@ -1148,6 +1138,29 @@ static void app(void)
 
                      }
 
+                     // List the ranking of users, sorted by user's ranking points
+                     else if(strcmp(buffer, "/ranking") == 0)
+                     {
+                        printf("The user %s tried to list the ranking\n", clients[i].name);
+
+                        // Sort the users by ranking points
+                        qsort(clients, clients_size, sizeof(Client), compare_ranking);
+
+                        char str[BUF_SIZE];                          
+
+                        strncpy(buffer, "Ranking:\n", BUF_SIZE - 1);
+                        for(int u = 0; u < clients_size; u++)
+                        {
+                           sprintf(str, "%d", clients[u].ranking);
+
+                           strncat(buffer, clients[u].name, BUF_SIZE - strlen(buffer) - 1);
+                           strncat(buffer, " - Points: ", BUF_SIZE - strlen(buffer) - 1);
+                           strncat(buffer, str, BUF_SIZE - strlen(buffer) - 1);
+                           strncat(buffer, "\n", BUF_SIZE - strlen(buffer) - 1);
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
@@ -1171,6 +1184,7 @@ static void app(void)
                         strncat(buffer, "/accept_challenge <<username>>: accept a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/reject_challenge <<username>>: reject a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/replay_party <<party_id>>: replay a party\n",                                         BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/ranking: list the ranking of users, sorted by user's ranking points\n",               BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
@@ -1268,6 +1282,14 @@ static void app(void)
    // Not only closing the sockets
    clear_clients(clients, clients_size);
    end_connection(sock);
+}
+
+int compare_ranking(const void *a, const void *b)
+{
+   Client *client_a = (Client *)a;
+   Client *client_b = (Client *)b;
+
+   return client_b->ranking - client_a->ranking;
 }
 
 int user_exists(Client* clients, int clients_size, char* username)
