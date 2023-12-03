@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "awale.h"
 
 #define CLEAR_SCREEN_ANSI "\033[H\033[J"
@@ -6,16 +7,16 @@
 
 // Display the Awale board on the screen
 //*************************************
-char* display(Awale game) {
+char* display(Awale game, char* player_one, char* player_two) {
     static char buffer[BUF_SIZE];  // Static buffer to hold the message
 
     // Clear the screen ANSI code
     snprintf(buffer, BUF_SIZE, "%s", CLEAR_SCREEN_ANSI);
 
     // Append the rest of the message
-    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "\n\n\nTurn: %s\n\n", (game.turn == 1 ? "Player One" : "Player Two"));
-    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   Player Two Score: %d\n", game.score_two);
-    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   Player One Score: %d\n", game.score_one);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "\n\n\nTurn: %s\n\n", (game.turn == 1 ? player_one : player_two));
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   %s Score: %d\n", player_two, game.score_two);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   %s Score: %d\n", player_one, game.score_one);
     snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   ┌─────┬─────┬─────┬─────┬─────┬─────┐\n");
     snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   │ %3d │ %3d │ %3d │ %3d │ %3d │ %3d │\n",
              game.player_two[5], game.player_two[4], game.player_two[3], game.player_two[2], game.player_two[1], game.player_two[0]);
@@ -181,7 +182,7 @@ void finish_game(Awale* game)
 
 // Display the winner
 //************************************
-char* display_winner(Awale game) {
+char* display_winner(Awale game, char* player_one, char* player_two) {
     static char buffer[BUF_SIZE];  // Static buffer to hold the message
 
     // Clear the screen ANSI code
@@ -189,17 +190,17 @@ char* display_winner(Awale game) {
 
     // Append the winner message
     if (game.score_one > game.score_two)
-        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is Player One!\n Congratulations!\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is %s\n Congratulations!\n\n", player_one);
     else if (game.score_one < game.score_two)
-        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is Player Two!\n Congratulations.\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is %s\n Congratulations.\n\n", player_two);
     else
-        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "It's a draw!\n Good job to both players.\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "It's a draw!\n\n");
 
     return buffer;
 }
 
 
-void run_game(Awale* game)
+/*void run_game(Awale* game)
 //*********************************
 {
     int move;

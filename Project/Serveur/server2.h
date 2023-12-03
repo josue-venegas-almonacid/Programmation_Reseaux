@@ -39,24 +39,62 @@ typedef struct in_addr IN_ADDR;
 
 typedef struct
 {
+   // ID of the party
    int id;
-   int player_one;
-   int player_two;
-   int observers[100];
+
+   // ID of the player one
+   Client* player_one;
+
+   // ID of the player two
+   Client* player_two;
+
+   // ID of the spectators
+   int spectators[MAX_CLIENTS];
+
+   // TODO: change the above structure and save everyone in a list
+
+   // Number of spectators
+   int spectators_size;
+
+   // Party mode
+   // 0 = public
+   // 1 = private
+   int mode;
+
+   // Game
    Awale* game;
+   // Status of the game, 0 = not started, 1 = started, 2 = finished
+   int status;
    int turn;
+
+   // Replay 200 moves max
+   char replay[200][BUF_SIZE];
+   int replay_size;
 }Party;
 
+// List of functions
 static void init(void);
 static void end(void);
-static void app(Awale* game);
+static void app(void);
+
+int compare_ranking(const void *a, const void *b);
+int user_exists(Client* clients, int clients_size, char* username);
+Client* get_client_by_id(Client *clients, int clients_size, int client_id);
+Client* get_client_by_username(Client *clients, int clients_size, char* username);
+Party*  get_party_by_id(Party *parties, int parties_size, int party_id);
+int is_friend(Client* client, Client* friend);
+int getRandomValue(int val1, int val2);
+
+void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color);
+void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color);
+
+static void clear_clients(Client *clients, int clients_size);
+static void remove_client(Client *clients, int to_remove, int *clients_size);
 static int init_connection(void);
 static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
-static void remove_client(Client *clients, int to_remove, int *actual);
-static void clear_clients(Client *clients, int actual);
-void send_message_to_client(Client *clients, char sender_id, char receiver_id, const char *buffer);
-Client get_client(Client *clients, char client_id);
+
+
 
 #endif /* guard */
