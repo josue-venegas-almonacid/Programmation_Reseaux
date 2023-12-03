@@ -1,3 +1,34 @@
+/** TODO: 
+ * ASSIGNED TO josue:
+ * - Create a function to give a party id (follow the same logic as the client id)
+ * 
+ * ASSIGNED TO hichem:
+ * - Create a party
+ * - Start a game
+ * - Save a finished game
+ * - Replay a saved game
+ * 
+ * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
+ * - Check cases when the user leaves a party and the game has started
+ * 
+ *  * ASSIGNED TO josue and hichem:
+ * - Check cases when the user disconnects and he is in a party and the game has started
+ * 
+ * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
+ * - Implement fork() to handle multiple games at the same time
+ * - Add ranking
+ * - Add function signatures to the header files
+ * 
+ * 
+ * - (OPTIONAL) challenges: Should be removed the challenges if the user disconnects?
+ * - (OPTIONAL) challenges: Should be removed the another challenges if the user accepts one challenge?
+ * - (OPTIONAL) fix:       /send and /broadcasting. instead of iterating over all the clients, iterate over party members only
+ * - (OPTIONAL) fix:       console. if the user receives a message while is typing, the typed message should be deleted
+ * - (OPTIONAL) fix:       console. improve the console interface for the client
+ * - (OPTIONAL) feature:   console. display the /help commands depending on the context (lobby, party, game)
+ * - (OPTIONAL) feature:   sockets. if an user wants to connect with the same username, disconnect the previous user
+*/
+
 /* Libraries */
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,25 +42,6 @@
 #include "server2.h"
 #include "client2.h"
 #include "awale.h"
-
-/** TODO: 
- * - Add bio
- * - Add friends
- * - Add challenges
- * - Add private party
- * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
- * - Add game
- * - Save a finished game
- * - Replay a saved game
- * - Check cases when the user leaves a party and the game has started
- * - Check cases when the user disconnects and he is in a party and the game has started
- * - Implement dynamic memory allocation (realloc, free) to list of clients and parties
- * - Implement fork() to handle multiple games at the same time
- * - Add ranking
- * - (OPTIONAL) improve the console interface for the client
- * - (OPTIONAL) fix: if the user is typing while a message is received, the message is not displayed correctly
- * - (OPTIONAL) display the /help commands depending on the context (lobby, party, game)
-*/
 
 /**
  * Initializes the necessary components for network communication.
@@ -72,7 +84,7 @@ static void app(void)
    // The buffer for the messages
    char buffer[BUF_SIZE];
    char command[BUF_SIZE];
-   char receiver_username[BUF_SIZE];
+   char other_username[BUF_SIZE];
    char mode[BUF_SIZE];
    char message[BUF_SIZE];
 
@@ -109,7 +121,7 @@ static void app(void)
       // Add socket of each client to the set
       for(int s = 0; s < clients_size; s++)
       {
-         FD_SET(clients[s].sock, &rdfs);
+         if(clients[s].sock != -1) FD_SET(clients[s].sock, &rdfs);
       }
 
       // If we overflow the maximum number of clients, we exit
@@ -146,30 +158,59 @@ static void app(void)
             continue;
          }
 
-         /* what is the new maximum socket number ? */
+         // Check the maximum socket number
          max = csock > max ? csock : max;
 
          FD_SET(csock, &rdfs);
 
-         // if the list of users is not full, add the new user
-         Client c = { 
-            sock: csock,
-            room_id: -1,
-            name: "",
-            bio: "",
-            challengers: { 0 },
-            challengers_size: 0,
-            friends: { 0 },
-            friends_size: 0
-         };
+         // Check if the user already exists
+         int id = user_exists(clients, clients_size, buffer);
 
-         strncpy(c.name, buffer, BUF_SIZE - 1);
-         clients[clients_size] = c;
-         clients_size++;
+         // If the user exists, reconnect him
+         if(id != -1)
+         {
+            Client* client = get_client_by_id(clients, clients_size, id);
 
-         printf("Client connected as %s with socket %i\n", c.name, c.sock);
+            // Update the socket
+            client->sock = csock;
 
-         // TODO: If the list of users is full, realloc
+            printf("User connected as %s with ID %i and socket %i\n", client->name, client->id, client->sock);
+
+            // Send a message to all the users in the lobby
+            strncpy(buffer, client->name, BUF_SIZE - 1);
+            strncat(buffer, " connected !", BUF_SIZE - strlen(buffer) - 1);
+            broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
+         }
+
+         // If the user does not exist, create a new user
+         else
+         {
+            // If the list of users is not full, add the new user
+            Client client = { 
+               sock: csock,
+               id: clients_size + 1,
+               party_id: -1,
+               name: "",
+               bio: "",
+               challengers: { 0 },
+               challengers_size: 0,
+               friends: { 0 },
+               friends_size: 0
+            };
+
+            strncpy(client.name, buffer, BUF_SIZE - 1);
+            clients[clients_size] = client;
+            
+            printf("User connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
+            clients_size++;
+            
+            // TODO: If the list of users is full, realloc
+
+            // Send a message to all the users in the lobby
+            strncpy(buffer, clients[clients_size - 1].name, BUF_SIZE - 1);
+            strncat(buffer, " connected !", BUF_SIZE - strlen(buffer) - 1);
+            broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
+         }
       }
 
       // Listen to all clients
@@ -186,20 +227,22 @@ static void app(void)
                // Client disconnected
                if(c == 0)
                {
-                  printf("The user %s disconnected\n", clients[i].name);
+                  printf("The user %s has disconnected\n", clients[i].name);
 
                   // TODO: If the client is in a game, stop it, leave the party and send a message to the other players
 
+                  // Change the player party id to the lobby
+                  clients[i].party_id = -1;
+
+                  // Close the socket
                   closesocket(clients[i].sock);
-                  remove_client(clients, i, &clients_size);
+                  clients[i].sock = -1;
+
+                  // Send a message to all the users in the lobby
                   strncpy(buffer, clients[i].name, BUF_SIZE - 1);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
 
-                  for(int j = 0; j < clients_size; j++)
-                  {
-                     int receiver_id = clients[j].sock;
-                     send_message_to_client(clients, clients_size, 0, receiver_id, buffer, yellow);
-                  }
+                  broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
                }
 
                // Client sent a message
@@ -210,16 +253,23 @@ static void app(void)
                   {
                      if(strcmp(buffer, "/list_users") == 0)
                      {
-                        printf("The user %s listed the users\n", clients[i].name);
+                        printf("The user %s tried to list the users\n", clients[i].name);
 
                         strncpy(buffer, "List of users:\n",             BUF_SIZE - 1);
                         for(int u = 0; u < clients_size; u++)
                         {
                            strncat(buffer, clients[u].name,             BUF_SIZE - strlen(buffer) - 1);
-                           if (clients[u].room_id == -1)
+                           
+                           if(clients[u].sock == -1)
+                           {
+                              strncat(buffer, " (DISCONNECTED)\n",      BUF_SIZE - strlen(buffer) - 1);
+                           }
+
+                           else if(clients[u].party_id == -1)
                            {
                               strncat(buffer, " (LOBBY)\n",             BUF_SIZE - strlen(buffer) - 1);
                            }
+                           
                            else
                            {
                               strncat(buffer, " (PARTY ID: ",           BUF_SIZE - strlen(buffer) - 1);
@@ -232,18 +282,18 @@ static void app(void)
 
                      else if(sscanf(buffer, "%s %[^\n]", command, message) == 2 && strncmp(command, "/chat", strlen("/chat")) == 0)
                      {
-                        printf("The user %s sent a message to the room %d\n", clients[i].name, clients[i].room_id);
+                        printf("The user %s tried to send a message to the room %d\n", clients[i].name, clients[i].party_id);
                         
                         // Send the message to all the users in the room (lobby/party)
-                        broadcast_message(clients, clients_size, clients[i].sock, clients[i].room_id, message, blue);
+                        broadcast_message(clients, clients_size, clients[i].id, clients[i].party_id, message, blue);
                      }
 
-                     else if(sscanf(buffer, "%s %s %[^\n]", command, receiver_username, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0)
+                     else if(sscanf(buffer, "%s %s %[^\n]", command, other_username, message) == 3 && strncmp(command, "/send", strlen("/send")) == 0)
                      {
-                        printf("The user %s sent a message to %s\n", clients[i].name, receiver_username);
+                        printf("The user %s tried to send a message to %s\n", clients[i].name, other_username);
 
                         // The user can not send a message to himself
-                        if(strcmp(clients[i].name, receiver_username) == 0){
+                        if(strcmp(clients[i].name, other_username) == 0){
                            strncpy(buffer, "You can not send a message to yourself\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
@@ -251,7 +301,7 @@ static void app(void)
                         // Try to send the message
                         else
                         {
-                           Client* receiver = get_client_by_username(clients, clients_size, receiver_username);
+                           Client* receiver = get_client_by_username(clients, clients_size, other_username);
 
                            // If the receiver does not exist, display an error
                            if(receiver == NULL) 
@@ -260,12 +310,22 @@ static void app(void)
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                            }
 
-                           // If the receiver exists, send the message
+                           // If the receiver exists, try to send the message
                            else
                            {
-                              send_message_to_client(clients, clients_size, clients[i].sock, receiver->sock, message, yellow);
-                              strncpy(buffer, "Message sent\n", BUF_SIZE - 1);
-                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                              if(receiver->sock == -1)
+                              {
+                                 strncpy(buffer, "User is disconnected\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }
+                              else
+                              {
+                                 send_message_to_client(clients, clients_size, clients[i].id, receiver->sock, message, yellow);
+
+                                 strncpy(buffer, "Message sent\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                              }
                            }
                         }
                      }
@@ -273,7 +333,7 @@ static void app(void)
                      else if(sscanf(buffer, "%s %s", command, mode) == 2 && strncmp(command, "/create_party", strlen("/create_party")) == 0)
                      {
                         // Check if the user is in a party already
-                        if(clients[i].room_id != -1)
+                        if(clients[i].party_id != -1)
                         {
                            strncpy(buffer, "You are already in a party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -288,22 +348,27 @@ static void app(void)
                            // Check if the party visibility is valid
                            if(party_visibility == 0)
                            {
-                              printf("The user %s created a public party\n", clients[i].name);
+                              printf("The user %s tried to create a public party\n", clients[i].name);
+
+                              /**
+                               * PUT THE CODE HERE TO CREATE A PUBLIC PARTY
+                               * 
+                               * 
+                               * 
+                               * 
+                              */
 
                               // hard-coded party
                               // DELETE THIS AFTER ADDING YOUR CODE
-                              Awale game_init = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
-                              game = &game_init;
                               Party party = {
-                                 id: parties_size,
-                                 player_one: &clients[i],
-                                 player_two: NULL,
+                                 id: 1,
+                                 player_one: clients[i].sock,
+                                 player_two: 0,
                                  spectators: { 0 },
                                  spectators_size: 0,
                                  mode: 0,
-                                 game: game,
-                                 game_started: 0,
-                                 turn: clients[i].sock
+                                 game: NULL,
+                                 turn: 4
                               };
                               
                               // Add the party to the list of parties
@@ -311,18 +376,18 @@ static void app(void)
                               parties_size++;
 
                               // Send a message to the user
-                              //strncpy(buffer, "Party created with public access\n", BUF_SIZE - 1);
-                              //send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                              strncpy(buffer, "Party created with public access\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
 
                               // Join the party
                               // Save the party id to the client room attribute
-                              clients[i].room_id = party.id;
+                              clients[i].party_id = party.id;
 
-                              printf("User %s joined the party %d as a player\n", clients[i].name, clients[i].room_id);
+                              printf("User %s joined the party %d as a player\n", clients[i].name, clients[i].party_id);
 
                               // Send a message to the user
-                              //strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
-                              send_message_to_client(clients, clients_size, 0, clients[i].sock, display(*game, party.player_one->name, "Second player score"), yellow);
+                              strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                            }
 
                            else if(party_visibility == 1)
@@ -345,7 +410,7 @@ static void app(void)
 
                      else if(strcmp(buffer, "/list_parties") == 0)
                      {
-                        printf("The user %s listed the parties\n", clients[i].name);
+                        printf("The user %s tried to list the parties\n", clients[i].name);
 
                         // TODO: Display the owner, visibility, players and spectators of each party
 
@@ -377,7 +442,7 @@ static void app(void)
                      else if(sscanf(buffer, "%s %s %s", command, message, mode) == 3 && strncmp(command, "/join_party", strlen("/join_party")) == 0)
                      {
                         // Check if the user is in a party already
-                        if(clients[i].room_id != -1)
+                        if(clients[i].party_id != -1)
                         {
                            strncpy(buffer, "You are already in a party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -398,43 +463,34 @@ static void app(void)
                            else
                            {
                               // Check if the party exists
-                              party = get_party_by_id(parties, parties_size, party_id);
+                              Party* party = get_party_by_id(parties, parties_size, party_id);
                               if(party == NULL)
                               {
                                  strncpy(buffer, "Party not found\n", BUF_SIZE - 1);
                                  send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                               }
+
                               // Check if the party is public or, if it's private, if the user is a friend of the owner
                               else
                               {
-                                 game = party->game;
                                  // Check if the party is public
                                  if(party->mode == 0)
                                  {
-                                    printf("The user %s joined the party %d in mode: %d\n", clients[i].name, party->id, join_mode);
-                                    // If join mode is 0, the user is joining as a player
-                                    if (join_mode == 0 && party->player_two == NULL)
-                                    {
-                                       party->player_two = &clients[i];
-                                       party->game_started = 1;
-                                       clients[i].room_id = party->id;
-                                       printf("User %s joined the party %d with %s\n", party->player_two->name, clients[i].room_id, party->player_one->name);
-                                       broadcast_message(clients, clients_size, 0, clients[i].room_id, display(*game, party->player_one->name, party->player_two->name), blue);
-                                    }
-                                    else
-                                    {
-                                       strncpy(buffer, "You can not join this party\n", BUF_SIZE - 1);
-                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
-                                    }
+                                    printf("The user %s tried to joined the party %d in mode: %d\n", clients[i].name, party->id, join_mode);
 
-                                    
+                                    // If join mode is 0, the user is joining as a player
                                     // If join mode is 1, the user is joining as a spectator
 
                                     // TODO: If the user tried to join as a player, check that the party is not full
                                     // TODO: If the user tried to join as a spectator, check that the list of spectators is not full
                                     // TODO: If the list of spectators is full, realloc
 
-                                    
+                                    // Save the party id to the client room attribute
+                                    clients[i].party_id = party->id;
+
+                                    // Send a message to the user
+                                    strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
+                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                                  }
 
                                  // Check if the party is private
@@ -459,9 +515,9 @@ static void app(void)
 
                      else if(strcmp(buffer, "/leave_party") == 0)
                      {
-                        printf("The user %s left the party %d\n", clients[i].name, clients[i].room_id);
+                        printf("The user %s tried to left the party %d\n", clients[i].name, clients[i].party_id);
                         // Check if the user is in a party
-                        if(clients[i].room_id == -1)
+                        if(clients[i].party_id == -1)
                         {
                            strncpy(buffer, "You are not in a party\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -473,7 +529,7 @@ static void app(void)
                         else
                         {
                            // Save the lobby id to the client room attribute
-                           clients[i].room_id = -1;
+                           clients[i].party_id = -1;
 
                            // Send a message to the user
                            strncpy(buffer, "You left the party\n", BUF_SIZE - 1);
@@ -481,12 +537,12 @@ static void app(void)
                         }
                      }
 
-                     else if(sscanf(buffer, "%s %[^\n]", command, receiver_username) == 2 && strncmp(command, "/add_friend", strlen("/add_friend")) == 0)
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/add_friend", strlen("/add_friend")) == 0)
                      {
-                        printf("The user %s sent a friend request to %s\n", clients[i].name, receiver_username);
+                        printf("The user %s tried to send a friend request to %s\n", clients[i].name, other_username);
 
                         // The user can not add himself as a friend
-                        if(strcmp(clients[i].name, receiver_username) == 0){
+                        if(strcmp(clients[i].name, other_username) == 0){
                            strncpy(buffer, "You can not add yourself as a friend\n", BUF_SIZE - 1);
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
@@ -494,7 +550,7 @@ static void app(void)
                         // Try to send the friend request
                         else
                         {
-                           Client* receiver = get_client_by_username(clients, clients_size, receiver_username);
+                           Client* receiver = get_client_by_username(clients, clients_size, other_username);
                            
                            // If the receiver does not exist, display an error
                            if(receiver == NULL) 
@@ -503,7 +559,7 @@ static void app(void)
                               send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                            }
 
-                           // If the receiver exists, send the friend request
+                           // If the receiver exists, try to send the friend request
                            else
                            {
                               int can_add = 1;
@@ -511,7 +567,7 @@ static void app(void)
                               // If the receiver is already a friend, display an error
                               for(int f = 0; f < clients[i].friends_size; f++)
                               {
-                                 if(clients[i].friends[f] == receiver->sock)
+                                 if(clients[i].friends[f] == receiver->id)
                                  {
                                     strncpy(buffer, "User is already a friend\n", BUF_SIZE - 1);
                                     send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -522,7 +578,7 @@ static void app(void)
                               // If the receiver has already a pending friend request from the sender, display an error
                               for(int f = 0; f < receiver->friend_requests_size; f++)
                               {
-                                 if(receiver->friend_requests[f] == clients[i].sock)
+                                 if(receiver->friend_requests[f] == clients[i].id)
                                  {
                                     strncpy(buffer, "Friend request already sent\n", BUF_SIZE - 1);
                                     send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
@@ -533,7 +589,7 @@ static void app(void)
                               if(can_add == 1)
                               {
                                  // Add the client id into the receiver friend requests
-                                 receiver->friend_requests[receiver->friend_requests_size] = clients[i].sock;
+                                 receiver->friend_requests[receiver->friend_requests_size] = clients[i].id;
                                  receiver->friend_requests_size++;
 
                                  // Send a message to the receiver
@@ -548,17 +604,516 @@ static void app(void)
                         }
                      }
 
+                     else if(strcmp(buffer, "/list_friend_requests") == 0)
+                     {
+                        printf("The user %s tried to list the friend requests\n", clients[i].name);
+
+                        strncpy(buffer, "List of friend requests:\n",         BUF_SIZE - 1);
+                        for(int u = 0; u < clients[i].friend_requests_size; u++)
+                        {
+                           Client* friend = get_client_by_id(clients, clients_size, clients[i].friend_requests[u]);
+                           strncat(buffer, friend->name,                      BUF_SIZE - strlen(buffer) - 1);
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_friend", strlen("/accept_friend")) == 0)
+                     {
+                        printf("The user %s tried to accept a friend request from %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        // If the user does not exist, display an error
+                        if(other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        // If the user exists, try to accept the friend request
+                        else
+                        {
+                           int found = 0;
+                           for(int f = 0; f < clients[i].friend_requests_size; f++)
+                           {
+                              // If the user has a pending friend request from the other user, accept it
+                              if(clients[i].friend_requests[f] == other_user->id)
+                              {
+                                 found = 1;
+
+                                 // Add the other user id into the user friends
+                                 clients[i].friends[clients[i].friends_size] = other_user->id;
+                                 clients[i].friends_size++;
+
+                                 // Add the user id into the other user friends
+                                 other_user->friends[other_user->friends_size] = clients[i].id;
+                                 other_user->friends_size++;
+
+                                 // Remove the friend request from the user list
+                                 memmove(clients[i].friend_requests + f, clients[i].friend_requests + f + 1, (clients[i].friend_requests_size - f - 1) * sizeof(int));
+                                 clients[i].friend_requests_size--;
+
+                                 // If this user also sent a friend request to the other user, remove that friend request in his list
+                                 for(int f = 0; f < other_user->friend_requests_size; f++)
+                                 {
+                                    if(other_user->friend_requests[f] == clients[i].id)
+                                    {
+                                       // Remove the friend request in the other user list
+                                       memmove(other_user->friend_requests + f, other_user->friend_requests + f + 1, (other_user->friend_requests_size - f - 1) * sizeof(int));
+                                       other_user->friend_requests_size--;
+                                       break;
+                                    }
+                                 }
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Friend request accepted\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 // Send a message to the other user
+                                 strncpy(buffer, clients[i].name, BUF_SIZE - 1);
+                                 strncat(buffer, " has accepted your friend request\n", BUF_SIZE - strlen(buffer) - 1);
+                                 send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+
+                                 break;
+                              }
+                           }
+
+                           // If the user does not have a pending friend request from the other user, display an error
+                           if(found == 0)
+                           {
+                              strncpy(buffer, "You don't have a friend request from this user\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }  
+                        }
+                     }
+                     
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/reject_friend", strlen("/reject_friend")) == 0)
+                     {
+                        printf("The user %s tried to reject a friend request from %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        // If the user does not exist, display an error
+                        if (other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        // If the user exists, try to reject his friend request
+                        else
+                        {
+                           int found = 0;
+                           for(int f = 0; f < clients[i].friend_requests_size; f++)
+                           {
+                              if(clients[i].friend_requests[f] == other_user->id)
+                              {
+                                 found = 1;
+
+                                 // Remove the friend request from the user list
+                                 memmove(clients[i].friend_requests + f, clients[i].friend_requests + f + 1, (clients[i].friend_requests_size - f - 1) * sizeof(int));
+                                 clients[i].friend_requests_size--;
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Friend request rejected\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 break;
+                              }
+                           }
+
+                           if(found == 0)
+                           {
+                              // If the user is not a friend, display an error
+                              strncpy(buffer, "You don't have a friend request from this user\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+                        }
+                     }
+
+                     else if(strcmp(buffer, "/list_friends") == 0)
+                     {
+                        printf("The user %s tried to list the friends\n", clients[i].name);
+
+                        strncpy(buffer, "List of friends:\n",                 BUF_SIZE - 1);
+                        for(int u = 0; u < clients[i].friends_size; u++)
+                        {
+                           Client* friend = get_client_by_id(clients, clients_size, clients[i].friends[u]);
+
+                           strncat(buffer, friend->name,                      BUF_SIZE - strlen(buffer) - 1);
+                           
+                           if(friend->sock == -1)
+                           {
+                              strncat(buffer, " (DISCONNECTED)\n",      BUF_SIZE - strlen(buffer) - 1);
+                           }
+
+                           else if(friend->party_id == -1)
+                           {
+                              strncat(buffer, " (LOBBY)\n",             BUF_SIZE - strlen(buffer) - 1);
+                           }
+                           
+                           else
+                           {
+                              strncat(buffer, " (PARTY ID: ",           BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, "TODO",                   BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, ")\n",                    BUF_SIZE - strlen(buffer) - 1);
+                           }
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/delete_friend", strlen("/delete_friend")) == 0)
+                     {
+                        printf("The user %s tried to delete a friend: %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        // If the user does not exist, display an error
+                        if (other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        // If the user exists, try to delete him
+                        else
+                        {
+                           int found = 0;
+                           for(int f = 0; f < clients[i].friends_size; f++)
+                           {
+                              if(clients[i].friends[f] == other_user->id)
+                              {
+                                 found = 1;
+
+                                 // Remove the friend from the user list
+                                 memmove(clients[i].friends + f, clients[i].friends + f + 1, (clients[i].friends_size - f - 1) * sizeof(int));
+                                 clients[i].friends_size--;
+
+                                 // Try to delete this user from the other user friends
+                                 for(int f = 0; f < other_user->friends_size; f++)
+                                 {
+                                    if(other_user->friends[f] == clients[i].id)
+                                    {
+                                       memmove(other_user->friends + f, other_user->friends + f + 1, (other_user->friends_size - f - 1) * sizeof(int));
+                                       other_user->friends_size--;
+                                       break;
+                                    }
+                                 }
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Friend deleted\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 break;
+                              }
+                           }
+
+                           if(found == 0)
+                           {
+                              // If the user is not a friend, display an error
+                              strncpy(buffer, "User is not a friend\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+                        }
+                     }
+                     
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/read_bio", strlen("/read_bio")) == 0)
+                     {
+                        printf("The user %s tried to read the bio of %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+                        
+                        if(other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           strncpy(buffer, other_user->bio, BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                        }
+                     }
+
+                     else if(sscanf(buffer, "%s %[^\n]", command, message) == 2 && strncmp(command, "/update_bio", strlen("/update_bio")) == 0)
+                     {
+                        printf("The user %s tried to update his bio to: %s\n", clients[i].name, message);
+
+                        // Update the bio
+                        strncpy(clients[i].bio, message, BUF_SIZE - 1);
+
+                        // Send a message to the user
+                        strncpy(buffer, "Bio updated\n", BUF_SIZE - 1);
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                     }
+
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/challenge", strlen("/challenge")) == 0)
+                     {
+                        printf("The user %s tried to challenge %s\n", clients[i].name, other_username);
+
+                        // The user can not challenge himself
+                        if(strcmp(clients[i].name, other_username) == 0){
+                           strncpy(buffer, "You can not challenge yourself\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           if(clients[i].party_id != -1)
+                           {
+                              strncpy(buffer, "You can not challenge someone while you are in a party\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+
+                           else
+                           {
+                              // Check if the user exists
+                              Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                              if (other_user == NULL)
+                              {
+                                 strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }
+
+                              else
+                              {
+                                 // If the user is disconnected, display an error
+                                 if(other_user->sock == -1)
+                                 {
+                                    strncpy(buffer, "User is disconnected\n", BUF_SIZE - 1);
+                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                 }
+
+                                 // If the user is already in a party, display an error
+                                 else if(other_user->party_id != -1)
+                                 {
+                                    strncpy(buffer, "User is already in a party\n", BUF_SIZE - 1);
+                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                 }
+
+                                 else
+                                 {
+                                    // Check if the user is already in the list of challengers
+                                    int found = 0;
+                                    for(int c = 0; c < other_user->challengers_size; c++)
+                                    {
+                                       if(other_user->challengers[c] == clients[i].id)
+                                       {
+                                          found = 1;
+
+                                          // If the user is already in the list of challengers, display an error
+                                          strncpy(buffer, "You have already challenged this user\n", BUF_SIZE - 1);
+                                          send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+
+                                          break;
+                                       }
+                                    }
+
+                                    // If the user is not in the list of challengers, send the challenge
+                                    if(found == 0)
+                                    {
+                                       // Add the user to the list of challengers
+                                       other_user->challengers[other_user->challengers_size] = clients[i].id;
+                                       other_user->challengers_size++;
+
+                                       // Send a message to the user
+                                       strncpy(buffer, "Challenge sent\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                       // Send a message to the other user
+                                       strncpy(buffer, "You have a new challenge from: ", BUF_SIZE - 1);
+                                       strncat(buffer, clients[i].name, BUF_SIZE - strlen(buffer) - 1);
+                                       send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+                                    }
+                                 }
+                              }
+                           }
+                        }
+                     }
+
+                     else if(strcmp(buffer, "/list_challenges") == 0)
+                     {
+                        printf("The user %s tried to list the challenges\n", clients[i].name);
+
+                        strncpy(buffer, "List of challenges:\n",                 BUF_SIZE - 1);
+                        for(int u = 0; u < clients[i].challengers_size; u++)
+                        {
+                           Client* challenger = get_client_by_id(clients, clients_size, clients[i].challengers[u]);
+
+                           strncat(buffer, challenger->name,                      BUF_SIZE - strlen(buffer) - 1);
+                        }
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/accept_challenge", strlen("/accept_challenge")) == 0)
+                     {
+                        printf("The user %s tried to accept a challenge from %s\n", clients[i].name, other_username);
+
+                        if(clients[i].party_id != -1)
+                        {
+                           strncpy(buffer, "You can not accept a challenge while you are in a party\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        else
+                        {
+                           // Check if the user exists
+                           Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                           // If the user does not exist, display an error
+                           if(other_user == NULL)
+                           {
+                              strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }
+
+                           // If the user exists, try to accept the challenge
+                           else
+                           {
+                              int found = 0;
+                              for(int f = 0; f < clients[i].challengers_size; f++)
+                              {
+                                 // If the user has a pending challenge from the other user, try to accept it
+                                 if(clients[i].challengers[f] == other_user->id)
+                                 {
+                                    found = 1;
+
+                                    // If the user who sent the challenge is disconnected, display an error
+                                    if(other_user->sock == -1)
+                                    {
+                                       strncpy(buffer, "User is disconnected\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                    }
+
+                                    // If the user who sent the challenge is in a party, display an error
+                                    else if(other_user->party_id != -1)
+                                    {
+                                       strncpy(buffer, "User is already in a party\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                    }
+
+                                    // If the user who sent the challenge is not in a party, accept the challenge
+                                    else
+                                    {
+                                       // Remove the challenge from the user list
+                                       memmove(clients[i].challengers + f, clients[i].challengers + f + 1, (clients[i].challengers_size - f - 1) * sizeof(int));
+                                       clients[i].challengers_size--;
+
+                                       // If this user also sent a challenge to the other user, remove that challenge in his list
+                                       for(int c = 0; c < other_user->challengers_size; c++)
+                                       {
+                                          if(other_user->challengers[c] == clients[i].id)
+                                          {
+                                             // Remove the challenge in the other user list
+                                             memmove(other_user->challengers + c, other_user->challengers + c + 1, (other_user->challengers_size - c - 1) * sizeof(int));
+                                             other_user->challengers_size--;
+                                             break;
+                                          }
+                                       }
+
+                                       // Send a message to the user
+                                       strncpy(buffer, "Challenge accepted\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                       // Send a message to the other user
+                                       strncpy(buffer, clients[i].name, BUF_SIZE - 1);
+                                       strncat(buffer, " has accepted your challenge\n", BUF_SIZE - strlen(buffer) - 1);
+                                       send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
+
+                                       // TODO: Create a new party with the challenger and the challenged
+                                       // TODO: Since both players are in the party, start the game
+                                    }
+
+                                    break;
+                                 }
+                              }
+
+                              // If the user does not have a pending challenge from the other user, display an error
+                              if(found == 0)
+                              {
+                                 strncpy(buffer, "You don't have a pending challenge from this user\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }  
+                           }
+                        }
+                     }
+
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/reject_challenge", strlen("/reject_challenge")) == 0)
+                     {
+                        printf("The user %s tried to reject a challenge from %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        // If the user does not exist, display an error
+                        if(other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        // If the user exists, try to reject the challenge
+                        else
+                        {
+                           int found = 0;
+                           for(int f = 0; f < clients[i].challengers_size; f++)
+                           {
+                              // If the user has a pending challenge from the other user, try to reject it
+                              if(clients[i].challengers[f] == other_user->id)
+                              {
+                                 found = 1;
+                                 
+                                 // Remove the challenge from the user list
+                                 memmove(clients[i].challengers + f, clients[i].challengers + f + 1, (clients[i].challengers_size - f - 1) * sizeof(int));
+                                 clients[i].challengers_size--;
+
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Challenge rejected\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 break;
+                              }
+                           }
+
+                           // If the user does not have a pending challenge from the other user, display an error
+                           if(found == 0)
+                           {
+                              strncpy(buffer, "You don't have a pending challenge from this user\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }  
+                        }
+
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
-                        strncpy(buffer, "Available commands\n",                                                                  BUF_SIZE - 1);
-                        strncat(buffer, "/list_users: list all the users connected\n",                                           BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/chat <<message>>: send a message to all users in the lobby or party\n",                BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/send <<username>> <<message>>: send a private message to an user\n",                   BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/create_party <<visibility>>: create a party. Visibility: 0 = public, 1 = private\n",   BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/list_parties: list all the parties\n",                                                 BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/join_party <<party_id>> <<mode>>: join a party. Mode: 0 = player, 1 = spectator\n",    BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/leave_party: leave the current party\n",                                               BUF_SIZE - strlen(buffer) - 1);
-                        strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                          BUF_SIZE - strlen(buffer) - 1);
+                        strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
+                        strncat(buffer, "/update_bio <<bio>>: update your bio\n",                                               BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/read_bio <<username>>: read the bio of an user\n",                                    BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_users: list all the users connected\n",                                          BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/chat <<message>>: send a message to all users in the lobby or party\n",               BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/send <<username>> <<message>>: send a private message to an user\n",                  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/create_party <<visibility>>: create a party. Visibility: 0 = public, 1 = private\n",  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_parties: list all the parties\n",                                                BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/join_party <<party_id>> <<mode>>: join a party. Mode: 0 = player, 1 = spectator\n",   BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/leave_party: leave the current party\n",                                              BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                         BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_friend_requests: list all the friend requests\n",                                BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/accept_friend <<username>>: accept a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/reject_friend <<username>>: reject a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_friends: list all the friends\n",                                                BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/delete_friend <<username>>: delete a friend\n",                                       BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/challenge <<username>>: challenge an user\n",                                         BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/list_challenges: list all the challenges\n",                                          BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/accept_challenge <<username>>: accept a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/reject_challenge <<username>>: reject a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
@@ -575,11 +1130,11 @@ static void app(void)
                   else
                   {
                      // if the user is in the lobby, he can only chat
-                     if(clients[i].room_id == -1)
-                        broadcast_message(clients, clients_size, clients[i].sock, clients[i].room_id, buffer, blue);
+                     if(clients[i].party_id == -1)
+                        broadcast_message(clients, clients_size, clients[i].id, clients[i].party_id, buffer, blue);
                      else
                      {
-                        party = get_party_by_id(parties, parties_size, clients[i].room_id);
+                        party = get_party_by_id(parties, parties_size, clients[i].party_id);
                         game = party->game;
 
                         // Waite for game to start
@@ -597,7 +1152,7 @@ static void app(void)
                                  continue;
                            }
 
-                           broadcast_message(clients, clients_size, 0, clients[i].room_id, display(*game, party->player_one->name, party->player_two->name), blue);
+                           broadcast_message(clients, clients_size, 0, clients[i].party_id, display(*game, party->player_one->name, party->player_two->name), blue);
                            if (is_game_over(game))
                               game->finished = 1;
                            party->turn = (party->turn == party->player_one->sock) ? party->player_two->sock : party->player_one->sock;
@@ -614,7 +1169,7 @@ static void app(void)
                         else {
                            // Finish the game and display the winner
                            finish_game(game);
-                           broadcast_message(clients, clients_size, 0, clients[i].room_id, display_winner(*game), blue);
+                           broadcast_message(clients, clients_size, 0, clients[i].party_id, display_winner(*game), blue);
                         } 
                         
                      }
@@ -627,15 +1182,31 @@ static void app(void)
       }
    }
 
+   // TODO: Here we should clear the list of clients, parties, spectators, friend requests, friends, challengers
+   // Not only closing the sockets
    clear_clients(clients, clients_size);
    end_connection(sock);
+}
+
+int user_exists(Client* clients, int clients_size, char* username)
+{
+   // Check in the list of clients. If the username exists, return the ID
+   for(int i = 0; i < clients_size; i++)
+   {
+      if(strcmp(clients[i].name, username) == 0)
+      {
+         return clients[i].id;
+      }
+   }
+
+   return -1;
 }
 
 Client* get_client_by_id(Client *clients, int clients_size, int client_id)
 {
    for(int i = 0; i < clients_size; i++)
    {
-      if(clients[i].sock == client_id)
+      if(clients[i].id == client_id)
       {
          return &clients[i];
       }
@@ -670,8 +1241,10 @@ Party* get_party_by_id(Party *parties, int parties_size, int party_id)
    return NULL;
 }
 
-void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_id, char *buffer, char *color)
+void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color)
 {
+   if(receiver_socket == -1) return;
+
    char message[BUF_SIZE];
    message[0] = 0;
 
@@ -695,14 +1268,14 @@ void send_message_to_client(Client *clients, int clients_size, int sender_id, in
    // Reset the color to white
    strncat(message, "\033[0;37m", BUF_SIZE - strlen(message) - 1);
 
-   write_client(receiver_id, message);
+   write_client(receiver_socket, message);
 }
 
-void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color)
+void broadcast_message(Client *clients, int clients_size, int sender_id, int party_id, char *buffer, char *color)
 {
    for(int i = 0; i < clients_size; i++)
    {
-      if(clients[i].room_id == room_id && clients[i].sock != sender_id)
+      if(clients[i].party_id == party_id && clients[i].id != sender_id)
       {
          send_message_to_client(clients, clients_size, sender_id, clients[i].sock, buffer, color);
       }
@@ -795,71 +1368,6 @@ static int getRandomValue(int min, int max) {
     // Return either min or max based on the random bit
     return (randomBit == 0) ? min : max;
 }
-
-/*static void old_create_party(Client *clients, int clients_size, int owner_id, Awale* game)
-{
-    // Create party with two players
-   //************************************
-   Party party = { 1 };
-   party.game = game;
-   party.player_one = 4;
-   party.player_two = 5;
-   party.turn = 4;
-
-   //test printing the game
-   char* displayMessage = display(*game);
-   // Print the message ( change with send to client)
-   //send_message_to_client(clients, clients_size, 0, owner_id, displayMessage);
-}
-
-static void old_create_game()
-{
-   Awale game={ {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
-}
-
-static void old_play_game(Party party, Awale* game, int client_id, char* buffer, int move, char* errorMessage)
-{
-   // Send the initial game state to the client
-   write_client(party.player_one, display(*game));
-   write_client(party.player_two, display(*game));
-
-   if( !game->finished && client_id == party.turn) {
-      // Player One's move
-      //snprintf(buffer, BUF_SIZE, "Your move: ");
-      strncpy(buffer, "Your move: ", BUF_SIZE - 1);
-      write_client(client_id, buffer);
-
-      read_client(client_id, buffer);
-      sscanf(buffer, "%d", &move);
-      while (check_move(game, game->turn, move, errorMessage)) {
-            write_client(client_id, errorMessage);
-            read_client(client_id, buffer);
-            sscanf(buffer, "%d", &move);
-      }
-
-      write_client(party.player_one, display(*game));
-      write_client(party.player_two, display(*game));
-      if(is_game_over(game))
-         game->finished = 1;
-      party.turn = (party.turn == 4) ? 5 : 4;
-   }
-   else if( !game->finished && client_id != party.turn) {
-      printf("Waiting for the other player move...\n");
-      // Player Two's move
-      snprintf(buffer, BUF_SIZE, "Waiting for the other player move...");
-      if(client_id == party.player_one)
-         write_client(party.player_two, buffer);
-      else if(client_id == party.player_two)
-         write_client(party.player_one, buffer); 
-   }
-   else {
-      // Finish the game and display the winner
-      printf("the game is finished\n");
-      finish_game(game);
-      write_client(party.player_one, display_winner(*game));
-      write_client(party.player_two, display_winner(*game));
-   }
-}*/
 
 int main(int argc, char **argv)
 {

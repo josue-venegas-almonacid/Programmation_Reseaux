@@ -51,21 +51,19 @@ typedef struct
    // ID of the spectators
    int spectators[MAX_CLIENTS];
 
-   // change the above structure and save everyone in a list
+   // TODO: change the above structure and save everyone in a list
 
    // Number of spectators
    int spectators_size;
 
    // Party mode
-   // 0 = private
-   // 1 = public
+   // 0 = public
+   // 1 = private
    int mode;
 
    // Game
    Awale* game;
-
    int game_started;
-
    int turn;
 }Party;
 
@@ -74,11 +72,13 @@ static void init(void);
 static void end(void);
 static void app(void);
 
+int user_exists(Client* clients, int clients_size, char* username);
+
 Client* get_client_by_id(Client *clients, int clients_size, int client_id);
 Client* get_client_by_username(Client *clients, int clients_size, char* username);
 Party*  get_party_by_id(Party *parties, int parties_size, int party_id);
 
-void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_id, char *buffer, char *color);
+void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color);
 void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color);
 
 static void old_create_party(Client *clients, int clients_size, int owner_id, Awale* game);
