@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "server2.h"
 #include "client2.h"
@@ -89,6 +90,10 @@ static void app(void)
    // The list of parties
    Party* parties = malloc(MAX_CLIENTS * sizeof(Party));
    int parties_size = 0;
+   Awale* game;
+   Party* party;
+   int move;
+   int turn;
 
    while(1)
    {
@@ -285,25 +290,20 @@ static void app(void)
                            {
                               printf("The user %s created a public party\n", clients[i].name);
 
-                              /**
-                               * PUT THE CODE HERE TO CREATE A PUBLIC PARTY
-                               * 
-                               * 
-                               * 
-                               * 
-                              */
-
                               // hard-coded party
                               // DELETE THIS AFTER ADDING YOUR CODE
+                              Awale game_init = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 1, 0 };
+                              game = &game_init;
                               Party party = {
-                                 id: 1,
-                                 player_one: clients[i].sock,
-                                 player_two: 0,
+                                 id: parties_size,
+                                 player_one: &clients[i],
+                                 player_two: NULL,
                                  spectators: { 0 },
                                  spectators_size: 0,
                                  mode: 0,
-                                 game: NULL,
-                                 turn: 4
+                                 game: game,
+                                 game_started: 0,
+                                 turn: clients[i].sock
                               };
                               
                               // Add the party to the list of parties
@@ -311,8 +311,8 @@ static void app(void)
                               parties_size++;
 
                               // Send a message to the user
-                              strncpy(buffer, "Party created with public access\n", BUF_SIZE - 1);
-                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+                              //strncpy(buffer, "Party created with public access\n", BUF_SIZE - 1);
+                              //send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
 
                               // Join the party
                               // Save the party id to the client room attribute
@@ -321,8 +321,8 @@ static void app(void)
                               printf("User %s joined the party %d as a player\n", clients[i].name, clients[i].room_id);
 
                               // Send a message to the user
-                              strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
-                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                              //strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, display(*game, party.player_one->name, "Second player score"), yellow);
                            }
 
                            else if(party_visibility == 1)
@@ -398,34 +398,43 @@ static void app(void)
                            else
                            {
                               // Check if the party exists
-                              Party* party = get_party_by_id(parties, parties_size, party_id);
+                              party = get_party_by_id(parties, parties_size, party_id);
                               if(party == NULL)
                               {
                                  strncpy(buffer, "Party not found\n", BUF_SIZE - 1);
                                  send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                               }
-
                               // Check if the party is public or, if it's private, if the user is a friend of the owner
                               else
                               {
+                                 game = party->game;
                                  // Check if the party is public
                                  if(party->mode == 0)
                                  {
                                     printf("The user %s joined the party %d in mode: %d\n", clients[i].name, party->id, join_mode);
-
                                     // If join mode is 0, the user is joining as a player
+                                    if (join_mode == 0 && party->player_two == NULL)
+                                    {
+                                       party->player_two = &clients[i];
+                                       party->game_started = 1;
+                                       clients[i].room_id = party->id;
+                                       printf("User %s joined the party %d with %s\n", party->player_two->name, clients[i].room_id, party->player_one->name);
+                                       broadcast_message(clients, clients_size, 0, clients[i].room_id, display(*game, party->player_one->name, party->player_two->name), blue);
+                                    }
+                                    else
+                                    {
+                                       strncpy(buffer, "You can not join this party\n", BUF_SIZE - 1);
+                                       send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                                    }
+
+                                    
                                     // If join mode is 1, the user is joining as a spectator
 
                                     // TODO: If the user tried to join as a player, check that the party is not full
                                     // TODO: If the user tried to join as a spectator, check that the list of spectators is not full
                                     // TODO: If the list of spectators is full, realloc
 
-                                    // Save the party id to the client room attribute
-                                    clients[i].room_id = party->id;
-
-                                    // Send a message to the user
-                                    strncpy(buffer, "You joined the party\n", BUF_SIZE - 1);
-                                    send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                                    
                                  }
 
                                  // Check if the party is private
@@ -565,7 +574,50 @@ static void app(void)
                   // If the buffer does not start with "/" then it's a move
                   else
                   {
-                     continue;
+                     // if the user is in the lobby, he can only chat
+                     if(clients[i].room_id == -1)
+                        broadcast_message(clients, clients_size, clients[i].sock, clients[i].room_id, buffer, blue);
+                     else
+                     {
+                        party = get_party_by_id(parties, parties_size, clients[i].room_id);
+                        game = party->game;
+
+                        // Waite for game to start
+                        if ( !party->game_started ) {
+                           strncpy(buffer, "Waiting for game to start\n", BUF_SIZE - 1);
+                           write_client(clients[i].sock, buffer);
+                        }
+                        else if ( !game->finished && clients[i].sock == party->turn) {
+                        
+                           //read_client(clients[i].sock, buffer);
+                           //sscanf(buffer, "%d", &move);
+                           move = atoi(buffer);
+                           if (check_move(game, game->turn, move, message)) {
+                                 write_client(clients[i].sock, message);
+                                 continue;
+                           }
+
+                           broadcast_message(clients, clients_size, 0, clients[i].room_id, display(*game, party->player_one->name, party->player_two->name), blue);
+                           if (is_game_over(game))
+                              game->finished = 1;
+                           party->turn = (party->turn == party->player_one->sock) ? party->player_two->sock : party->player_one->sock;
+                           // Send message to the other player
+                           snprintf(message, BUF_SIZE, "Your move: ");
+                           write_client(party->turn, message);
+
+                        }
+                        else if ( !game->finished && clients[i].sock != party->turn) {
+                           // Player Two's move
+                           snprintf(message, BUF_SIZE, "Waiting for the other player move...");
+                           write_client(clients[i].sock, message);
+                        }
+                        else {
+                           // Finish the game and display the winner
+                           finish_game(game);
+                           broadcast_message(clients, clients_size, 0, clients[i].room_id, display_winner(*game), blue);
+                        } 
+                        
+                     }
                   }
                }
 
@@ -733,7 +785,18 @@ static void write_client(SOCKET sock, const char *buffer)
    }
 }
 
-static void old_create_party(Client *clients, int clients_size, int owner_id, Awale* game)
+static int getRandomValue(int min, int max) {
+    // Seed the random number generator with the current time
+    srand((unsigned int)time(NULL));
+
+    // Generate a random number 0 or 1
+    int randomBit = rand() % 2;
+
+    // Return either min or max based on the random bit
+    return (randomBit == 0) ? min : max;
+}
+
+/*static void old_create_party(Client *clients, int clients_size, int owner_id, Awale* game)
 {
     // Create party with two players
    //************************************
@@ -796,7 +859,7 @@ static void old_play_game(Party party, Awale* game, int client_id, char* buffer,
       write_client(party.player_one, display_winner(*game));
       write_client(party.player_two, display_winner(*game));
    }
-}
+}*/
 
 int main(int argc, char **argv)
 {

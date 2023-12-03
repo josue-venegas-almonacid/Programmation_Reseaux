@@ -7,16 +7,16 @@
 
 // Display the Awale board on the screen
 //*************************************
-char* display(Awale game) {
+char* display(Awale game, char* player_one, char* player_two) {
     static char buffer[BUF_SIZE];  // Static buffer to hold the message
 
     // Clear the screen ANSI code
     snprintf(buffer, BUF_SIZE, "%s", CLEAR_SCREEN_ANSI);
 
     // Append the rest of the message
-    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "\n\n\nTurn: %s\n\n", (game.turn == 1 ? "Player One" : "Player Two"));
-    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   Player Two Score: %d\n", game.score_two);
-    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   Player One Score: %d\n", game.score_one);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "\n\n\nTurn: %s\n\n", (game.turn == 1 ? player_one : player_two));
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   %s Score: %d\n", player_two, game.score_two);
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   %s Score: %d\n", player_one, game.score_one);
     snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   ┌─────┬─────┬─────┬─────┬─────┬─────┐\n");
     snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "   │ %3d │ %3d │ %3d │ %3d │ %3d │ %3d │\n",
              game.player_two[5], game.player_two[4], game.player_two[3], game.player_two[2], game.player_two[1], game.player_two[0]);
@@ -200,7 +200,7 @@ char* display_winner(Awale game) {
 }
 
 
-void run_game(Awale* game)
+/*void run_game(Awale* game)
 //*********************************
 {
     int move;

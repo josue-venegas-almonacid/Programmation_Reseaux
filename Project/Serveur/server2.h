@@ -43,10 +43,10 @@ typedef struct
    int id;
 
    // ID of the player one
-   int player_one;
+   Client* player_one;
 
    // ID of the player two
-   int player_two;
+   Client* player_two;
 
    // ID of the spectators
    int spectators[MAX_CLIENTS];
@@ -64,7 +64,8 @@ typedef struct
    // Game
    Awale* game;
 
-   // Delete this
+   int game_started;
+
    int turn;
 }Party;
 
