@@ -78,6 +78,7 @@ Client* get_client_by_id(Client *clients, int clients_size, int client_id);
 Client* get_client_by_username(Client *clients, int clients_size, char* username);
 Party*  get_party_by_id(Party *parties, int parties_size, int party_id);
 int is_friend(Client* client, Client* friend);
+int getRandomValue(int val1, int val2);
 
 void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color);
 void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color);
