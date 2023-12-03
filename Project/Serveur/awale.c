@@ -182,7 +182,7 @@ void finish_game(Awale* game)
 
 // Display the winner
 //************************************
-char* display_winner(Awale game) {
+char* display_winner(Awale game, char* player_one, char* player_two) {
     static char buffer[BUF_SIZE];  // Static buffer to hold the message
 
     // Clear the screen ANSI code
@@ -190,11 +190,11 @@ char* display_winner(Awale game) {
 
     // Append the winner message
     if (game.score_one > game.score_two)
-        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is Player One!\n Congratulations!\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is %s\n Congratulations!\n\n", player_one);
     else if (game.score_one < game.score_two)
-        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is Player Two!\n Congratulations.\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "The winner is %s\n Congratulations.\n\n", player_two);
     else
-        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "It's a draw!\n Good job to both players.\n\n");
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "It's a draw!\n\n");
 
     return buffer;
 }
