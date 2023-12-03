@@ -1,5 +1,4 @@
 # Awale Game
-"""
 This code implements the game of Awale.
 
 Awale is a traditional African board game played with a wooden board and seeds. The board consists of 12 holes, with 6 holes on each side. Each hole initially contains a certain number of seeds.
@@ -10,7 +9,6 @@ The rules of Awale are as follows:
 3. The game ends when one player has no more seeds on their side of the board.
 4. The player with the most seeds in their store (the two holes at the ends of the board) wins the game.
 
-"""
 
 ## Creators
 - YAGOUBI Hichem

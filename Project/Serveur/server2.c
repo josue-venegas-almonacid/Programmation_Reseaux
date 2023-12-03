@@ -1,23 +1,3 @@
-/** TODO: 
- * - Since we are not deleting the parties, what happens if the game has finished and someone whants to join in the party?
- * - If the game has started, can i join as a spectator?
- * - Should we remove the challenges sent if the user disconnects? The other user can accept them if he is online
- * - Should we remove the another challenges if the user accepts one challenge?
- * 
- * - Check cases when the user disconnects and he is in a party (being the owner, the second player or spectator)
- * - Check cases when the user leaves a party and the game has started
- * - Check cases when the user disconnects and he is in a party and the game has started
- * 
- * - Implement dynamic memory allocation (realloc, free) to list of clients, parties, spectators, friend requests, friends, challengers
- * - Add function signatures to the header files
- * 
- * 
- * - (OPTIONAL) fix:       /send and /broadcasting. instead of iterating over all the clients, iterate over party members only
- * - (OPTIONAL) fix:       console. if the user receives a message while is typing, the typed message should be deleted
- * - (OPTIONAL) fix:       console. improve the console interface for the client
- **/
-
-/* Libraries */
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -31,10 +11,6 @@
 #include "client2.h"
 #include "awale.h"
 
-/**
- * Initializes the necessary components for network communication.
- * If the operating system is Windows, it uses Winsock.
- */
 static void init(void)
 {
 #ifdef WIN32
@@ -48,10 +24,6 @@ static void init(void)
 #endif
 }
 
-/**
- * Cleans up any resources used by the server. On Windows, 
- * it calls WSACleanup() to clean up the Winsock library.
- */
 static void end(void)
 {
 #ifdef WIN32
@@ -59,9 +31,6 @@ static void end(void)
 #endif
 }
 
-/**
- * The main application function. It initializes the server,
-*/
 static void app(void)
 {
    // The socket for the server
@@ -194,8 +163,6 @@ static void app(void)
             
             printf("User connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
             clients_size++;
-            
-            // TODO: If the list of users is full, realloc
 
             // Send a message to all the users in the lobby
             strncpy(buffer, clients[clients_size - 1].name, BUF_SIZE - 1);
@@ -218,8 +185,6 @@ static void app(void)
                if(c == 0)
                {
                   printf("The user %s has disconnected\n", clients[i].name);
-
-                  // TODO: If the client is in a game, stop it, leave the party and send a message to the other players
 
                   // Change the player party id to the lobby
                   clients[i].party_id = -1;
@@ -252,6 +217,10 @@ static void app(void)
                         strncpy(buffer, "List of users:\n",             BUF_SIZE - 1);
                         for(int u = 0; u < clients_size; u++)
                         {
+                           char str[BUF_SIZE];
+                           sprintf(str, "%d", clients[u].party_id);
+
+
                            strncat(buffer, clients[u].name,             BUF_SIZE - strlen(buffer) - 1);
                            
                            if(clients[u].sock == -1)
@@ -267,7 +236,7 @@ static void app(void)
                            else
                            {
                               strncat(buffer, " (PARTY ID: ",           BUF_SIZE - strlen(buffer) - 1);
-                              strncat(buffer, "TODO",                   BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, str,                      BUF_SIZE - strlen(buffer) - 1);
                               strncat(buffer, ")\n",                    BUF_SIZE - strlen(buffer) - 1);
                            }
                         }
@@ -335,8 +304,6 @@ static void app(void)
 
                         else
                         {
-                           // TODO: If the list of parties is full, realloc
-
                            int party_visibility = atoi(mode);
 
                            if (party_visibility != 0 && party_visibility != 1)
@@ -415,7 +382,6 @@ static void app(void)
                      {
                         printf("The user %s tried to list the parties\n", clients[i].name);
 
-                        // TODO: Display the owner, visibility, players and spectators of each party
                         char str[BUF_SIZE];
                         strncpy(buffer, "List of parties:\n", BUF_SIZE - 1);
                         for(int p = 0; p < parties_size; p++)
@@ -506,7 +472,6 @@ static void app(void)
                                     { 
                                        if (party->spectators_size == MAX_CLIENTS)
                                        {
-                                          // TODO: Realloc the list of spectators
                                           strncpy(buffer, "The party is full\n", BUF_SIZE - 1);
                                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                                           continue;
@@ -541,9 +506,6 @@ static void app(void)
                            send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                         }
 
-                        // TODO: If the user is in the middle of a game, stop it and send the message to everyone in the party
-                        // TODO: If the user is the owner of the party, kick everyone, delete the party and send the message to everyone in the party
-                        // Or maybe just transfer the ownership to the player2 and delete the party only if there is not player1 nor player2
                         else
                         {
                            // Save the lobby id to the client room attribute
@@ -760,6 +722,8 @@ static void app(void)
                         for(int u = 0; u < clients[i].friends_size; u++)
                         {
                            Client* friend = get_client_by_id(clients, clients_size, clients[i].friends[u]);
+                           char str[BUF_SIZE];
+                           sprintf(str, "%d", friend->party_id);
 
                            strncat(buffer, friend->name,                      BUF_SIZE - strlen(buffer) - 1);
                            
@@ -776,7 +740,7 @@ static void app(void)
                            else
                            {
                               strncat(buffer, " (PARTY ID: ",           BUF_SIZE - strlen(buffer) - 1);
-                              strncat(buffer, "TODO",                   BUF_SIZE - strlen(buffer) - 1);
+                              strncat(buffer, str,                      BUF_SIZE - strlen(buffer) - 1);
                               strncat(buffer, ")\n",                    BUF_SIZE - strlen(buffer) - 1);
                            }
                         }
@@ -1296,8 +1260,6 @@ static void app(void)
       }
    }
 
-   // TODO: Here we should clear the list of clients, parties, spectators, friend requests, friends, challengers
-   // Not only closing the sockets
    clear_clients(clients, clients_size);
    end_connection(sock);
 }
