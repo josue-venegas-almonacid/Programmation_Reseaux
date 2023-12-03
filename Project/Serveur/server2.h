@@ -63,7 +63,8 @@ typedef struct
 
    // Game
    Awale* game;
-   int game_started;
+   // Status of the game, 0 = not started, 1 = started, 2 = finished
+   int status;
    int turn;
 
    // Replay 200 moves max

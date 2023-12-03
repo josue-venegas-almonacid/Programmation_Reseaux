@@ -359,7 +359,7 @@ static void app(void)
                               spectators_size: 0,
                               mode: party_visibility,
                               game: game,
-                              game_started: 0,
+                              status: 0,
                               turn: clients[i].sock
                            };
                            
@@ -472,6 +472,11 @@ static void app(void)
                                  strncpy(buffer, "Party not found\n", BUF_SIZE - 1);
                                  send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                               }
+                              else if(party->status == 2)
+                              {
+                                 strncpy(buffer, "The party is over\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              }
                               else
                               {
                                  game = party->game;
@@ -482,7 +487,7 @@ static void app(void)
                                     if (join_mode == 0 && party->player_two == NULL)
                                     {
                                        party->player_two = &clients[i];
-                                       party->game_started = 1;
+                                       party->status = 1;
                                        party->turn = getRandomValue(party->player_one->sock, party->player_two->sock);
                                        // Print turn
                                        printf("The turn is %d\n", party->turn);
@@ -1051,7 +1056,7 @@ static void app(void)
                                           spectators_size: 0,
                                           mode: 0,
                                           game: game,
-                                          game_started: 0,
+                                          status: 0,
                                           turn: 0
                                        };
 
@@ -1065,7 +1070,7 @@ static void app(void)
                                        other_user->party_id = party->id;
                                        
                                        game = party->game;
-                                       party->game_started = 1;
+                                       party->status = 1;
                                        party->turn = getRandomValue(party->player_one->sock, party->player_two->sock);
                                        // Print turn
                                        printf("The turn is %d\n", party->turn);
@@ -1201,9 +1206,6 @@ static void app(void)
                   // If the buffer does not start with "/" then it's a move or a chat in the lobby
                   else
                   {
-                     printf("buffer: %s\n", buffer);
-                     // print client status
-                     printf("client %s status: party_id: %d, replay_party_id: %d, replay_position: %d\n", clients[i].name, clients[i].party_id, clients[i].replay_party_id, clients[i].replay_position);
                      // if the user is in the lobby, he can only chat
                      if(clients[i].party_id == -1)
                         broadcast_message(clients, clients_size, clients[i].id, clients[i].party_id, buffer, blue);
@@ -1226,7 +1228,7 @@ static void app(void)
                         game = party->game;
 
                         // Waite for game to start
-                        if ( !party->game_started ) {
+                        if ( !party->status ) {
                            strncpy(buffer, "Waiting for game to start\n", BUF_SIZE - 1);
                            write_client(clients[i].sock, buffer);
                         }
@@ -1262,6 +1264,10 @@ static void app(void)
                         else {
                            // Finish the game and display the winner
                            finish_game(game);
+                           party->status = 2;
+                           party->player_one->party_id = -1;
+                           party->player_two->party_id = -1;
+
                            // Add end to replay
                            strncpy(party->replay[party->replay_size], display_winner(*game, party->player_one->name, party->player_two->name), BUF_SIZE - 1);
                            party->replay_size++;
