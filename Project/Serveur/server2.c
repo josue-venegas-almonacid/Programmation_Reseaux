@@ -139,35 +139,45 @@ static void app(void)
             broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
          }
 
-         // If the user does not exist, create a new user
+         // If the user does not exist, try to create a new user
          else
          {
-            // If the list of users is not full, add the new user
-            Client client = { 
-               sock: csock,
-               id: clients_size + 1,
-               party_id: -1,
-               name: "",
-               bio: "",
-               challengers: { 0 },
-               challengers_size: 0,
-               friends: { 0 },
-               friends_size: 0,
-               replay_party_id: -1,
-               replay_position: 0,
-               ranking: 0
-            };
+            if (clients_size == MAX_CLIENTS)
+            {
+               strncpy(buffer, "The server is full\n", BUF_SIZE - 1);
+               send_message_to_client(clients, clients_size, 0, csock, buffer, red);
+               continue;
+            }
 
-            strncpy(client.name, buffer, BUF_SIZE - 1);
-            clients[clients_size] = client;
-            
-            printf("User connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
-            clients_size++;
+            else
+            {
+               // If the list of users is not full, add the new user
+               Client client = { 
+                  sock: csock,
+                  id: clients_size + 1,
+                  party_id: -1,
+                  name: "",
+                  bio: "",
+                  challengers: { 0 },
+                  challengers_size: 0,
+                  friends: { 0 },
+                  friends_size: 0,
+                  replay_party_id: -1,
+                  replay_position: 0,
+                  ranking: 0
+               };
 
-            // Send a message to all the users in the lobby
-            strncpy(buffer, clients[clients_size - 1].name, BUF_SIZE - 1);
-            strncat(buffer, " connected !", BUF_SIZE - strlen(buffer) - 1);
-            broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
+               strncpy(client.name, buffer, BUF_SIZE - 1);
+               clients[clients_size] = client;
+               
+               printf("User connected as %s with ID %i and socket %i\n", clients[clients_size].name, clients[clients_size].id, clients[clients_size].sock);
+               clients_size++;
+
+               // Send a message to all the users in the lobby
+               strncpy(buffer, clients[clients_size - 1].name, BUF_SIZE - 1);
+               strncat(buffer, " connected !", BUF_SIZE - strlen(buffer) - 1);
+               broadcast_message(clients, clients_size, 0, -1, buffer, yellow);
+            }
          }
       }
 
@@ -313,33 +323,43 @@ static void app(void)
                               continue;
                            }
 
-                           printf("The user %s created a %s party\n", clients[i].name, party_visibility == 0 ? "public" : "private");
+                           printf("The user %s tried to create a %s party\n", clients[i].name, party_visibility == 0 ? "public" : "private");
 
-                           // Create a new game
-                           Awale game_init = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 0, 0 };
-                           game = &game_init;
-                           Party party = {
-                              id: parties_size,
-                              player_one: &clients[i],
-                              player_two: NULL,
-                              spectators: { 0 },
-                              spectators_size: 0,
-                              mode: party_visibility,
-                              game: game,
-                              game_started: 0,
-                              turn: clients[i].sock
-                           };
-                           
-                           // Add the party to the list of parties
-                           parties[parties_size] = party;
-                           parties_size++;
+                           if(parties_size == MAX_CLIENTS)
+                           {
+                              strncpy(buffer, "The list of parties is full\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                              continue;
+                           }
 
-                           // Join the party
-                           // Save the party id to the client room attribute
-                           clients[i].party_id = party.id;
+                           else
+                           {
+                              // Create a new game
+                              Awale game_init = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 0, 0 };
+                              game = &game_init;
+                              Party party = {
+                                 id: parties_size,
+                                 player_one: &clients[i],
+                                 player_two: NULL,
+                                 spectators: { 0 },
+                                 spectators_size: 0,
+                                 mode: party_visibility,
+                                 game: game,
+                                 game_started: 0,
+                                 turn: clients[i].sock
+                              };
+                              
+                              // Add the party to the list of parties
+                              parties[parties_size] = party;
+                              parties_size++;
 
-                           // Display party to the player
-                           send_message_to_client(clients, clients_size, 0, clients[i].sock, display(*game, party.player_one->name, "Second player"), yellow);
+                              // Join the party
+                              // Save the party id to the client room attribute
+                              clients[i].party_id = party.id;
+
+                              // Display party to the player
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, display(*game, party.player_one->name, "Second player"), yellow);
+                           }
                         }
 
                      }
@@ -1004,41 +1024,50 @@ static void app(void)
                                        strncat(buffer, " has accepted your challenge\n", BUF_SIZE - strlen(buffer) - 1);
                                        send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, yellow);
 
-                                       // Create party and game
-                                       Awale game_init = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 0, 0 };
-                                       game = &game_init;
-                                       Party party_init = {
-                                          id: parties_size,
-                                          player_one: &clients[i],
-                                          player_two: other_user,
-                                          spectators: { 0 },
-                                          spectators_size: 0,
-                                          mode: 0,
-                                          game: game,
-                                          game_started: 0,
-                                          turn: 0
-                                       };
+                                       if(parties_size == MAX_CLIENTS)
+                                       {
+                                          strncpy(buffer, "The list of parties is full\n", BUF_SIZE - 1);
+                                          send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                                          send_message_to_client(clients, clients_size, 0, other_user->sock, buffer, red);
+                                          continue;
+                                       }
 
-                                       // Add the party to the list of parties
-                                       parties[parties_size] = party_init;
-                                       parties_size++;
-                                 
-                                       party = get_party_by_id(parties, parties_size, parties_size-1);
-                                       // Save the party id to the client room attribute
-                                       clients[i].party_id = party->id;
-                                       other_user->party_id = party->id;
-                                       
-                                       game = party->game;
-                                       party->game_started = 1;
-                                       party->turn = getRandomValue(party->player_one->sock, party->player_two->sock);
-                                       // Print turn
-                                       printf("The turn is %d\n", party->turn);
-                                       game->turn = (party->turn == party->player_one->sock) ? 1 : 2;
-                                       printf("The game turn is %d\n", game->turn);
-                                       broadcast_message(clients, clients_size, 0, clients[i].party_id, display(*game, party->player_one->name, party->player_two->name), blue);
-                                 
+                                       else
+                                       {
+                                          // Create party and game
+                                          Awale game_init = { {4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4}, 0, 0, 0, 0 };
+                                          game = &game_init;
+                                          Party party_init = {
+                                             id: parties_size,
+                                             player_one: &clients[i],
+                                             player_two: other_user,
+                                             spectators: { 0 },
+                                             spectators_size: 0,
+                                             mode: 0,
+                                             game: game,
+                                             game_started: 0,
+                                             turn: 0
+                                          };
+
+                                          // Add the party to the list of parties
+                                          parties[parties_size] = party_init;
+                                          parties_size++;
+                                    
+                                          party = get_party_by_id(parties, parties_size, parties_size-1);
+                                          // Save the party id to the client room attribute
+                                          clients[i].party_id = party->id;
+                                          other_user->party_id = party->id;
+                                          
+                                          game = party->game;
+                                          party->game_started = 1;
+                                          party->turn = getRandomValue(party->player_one->sock, party->player_two->sock);
+                                          // Print turn
+                                          printf("The turn is %d\n", party->turn);
+                                          game->turn = (party->turn == party->player_one->sock) ? 1 : 2;
+                                          printf("The game turn is %d\n", game->turn);
+                                          broadcast_message(clients, clients_size, 0, clients[i].party_id, display(*game, party->player_one->name, party->player_two->name), blue);
+                                       }
                                     } 
-
 
                                     break;
                                  }
