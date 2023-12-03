@@ -416,6 +416,7 @@ static void app(void)
                               {
                                  clients[i].replay_position = 0;
                                  clients[i].replay_party_id = -1;
+                                 clients[i].party_id = -1;
                               }
                                
                            }
@@ -1189,19 +1190,23 @@ static void app(void)
                   // If the buffer does not start with "/" then it's a move or a chat in the lobby
                   else
                   {
+                     printf("buffer: %s\n", buffer);
+                     // print client status
+                     printf("client %s status: party_id: %d, replay_party_id: %d, replay_position: %d\n", clients[i].name, clients[i].party_id, clients[i].replay_party_id, clients[i].replay_position);
                      // if the user is in the lobby, he can only chat
                      if(clients[i].party_id == -1)
                         broadcast_message(clients, clients_size, clients[i].id, clients[i].party_id, buffer, blue);
+                     // user replaying a party
                      else if(clients[i].party_id == -2)
                      {
                         party = get_party_by_id(parties, parties_size, clients[i].replay_party_id);
-                        int replay_position = clients[i].replay_position;
-                        clients[i].replay_position++;
-                        send_message_to_client(clients, clients_size, 0, clients[i].sock, party->replay[replay_position], blue);
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, party->replay[clients[i].replay_position++], blue);
                         if (clients[i].replay_position == party->replay_size)
                         {
                            clients[i].replay_position = 0;
                            clients[i].replay_party_id = -1;
+                           clients[i].party_id = -1;
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, "Replay finished!", blue);
                         }
                      }
                      else
@@ -1250,9 +1255,9 @@ static void app(void)
                            strncpy(party->replay[party->replay_size], display_winner(*game, party->player_one->name, party->player_two->name), BUF_SIZE - 1);
                            party->replay_size++;
                            broadcast_message(clients, clients_size, 0, clients[i].party_id, display_winner(*game, party->player_one->name, party->player_two->name), blue);
-                           if (game.score_one > game.score_two)
+                           if (game->score_one > game->score_two)
                               party->player_one->ranking++;
-                           else if (game.score_one < game.score_two)
+                           else if (game->score_one < game->score_two)
                               party->player_two->ranking++;
                               
                         } 

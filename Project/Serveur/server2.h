@@ -66,8 +66,8 @@ typedef struct
    int game_started;
    int turn;
 
-   // Replay
-   char replay[100][BUF_SIZE];
+   // Replay 200 moves max
+   char replay[200][BUF_SIZE];
    int replay_size;
 }Party;
 
@@ -77,7 +77,6 @@ static void end(void);
 static void app(void);
 
 int user_exists(Client* clients, int clients_size, char* username);
-
 Client* get_client_by_id(Client *clients, int clients_size, int client_id);
 Client* get_client_by_username(Client *clients, int clients_size, char* username);
 Party*  get_party_by_id(Party *parties, int parties_size, int party_id);
