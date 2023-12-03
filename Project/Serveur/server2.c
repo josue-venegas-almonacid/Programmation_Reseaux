@@ -1162,7 +1162,7 @@ static void app(void)
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
 
-                     else if(strcmp(buffer, "/help") == 0)
+                     else if(strcmp(buffer, "/help_1") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
                         strncat(buffer, "/update_bio <<bio>>: update your bio\n",                                               BUF_SIZE - strlen(buffer) - 1);
@@ -1174,6 +1174,13 @@ static void app(void)
                         strncat(buffer, "/list_parties: list all the parties\n",                                                BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/join_party <<party_id>> <<mode>>: join a party. Mode: 0 = player, 1 = spectator\n",   BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/leave_party: leave the current party\n",                                              BUF_SIZE - strlen(buffer) - 1);
+                        
+                        send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
+                     }
+
+                     else if(strcmp(buffer, "/help_2") == 0)
+                     {
+                        strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
                         strncat(buffer, "/add_friend <<username>>: send a friend request to an user\n",                         BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_friend_requests: list all the friend requests\n",                                BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/accept_friend <<username>>: accept a friend request from an user\n",                  BUF_SIZE - strlen(buffer) - 1);
@@ -1192,8 +1199,8 @@ static void app(void)
 
                      else
                      {
-                        strncpy(buffer, "Unknown command\n",                               BUF_SIZE - 1);
-                        strncat(buffer, "Type /help for a list of available commands\n",   BUF_SIZE - strlen(buffer) - 1);
+                        strncpy(buffer, "Unknown command\n",                                             BUF_SIZE - 1);
+                        strncat(buffer, "Type /help_1 and /help_2 for a list of available commands\n",   BUF_SIZE - strlen(buffer) - 1);
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
                      }
                   }
