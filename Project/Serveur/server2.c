@@ -1,6 +1,5 @@
 /** TODO: 
  * ASSIGNED TO josue:
- * - Decline challenges
  * - Create a function to give a party id (follow the same logic as the client id)
  * 
  * ASSIGNED TO hichem:
@@ -21,9 +20,10 @@
  * - Add function signatures to the header files
  * 
  * 
- * - (OPTIONAL) challenges: Should be remove the challenges if the user disconnects?
+ * - (OPTIONAL) challenges: Should be removed the challenges if the user disconnects?
+ * - (OPTIONAL) challenges: Should be removed the another challenges if the user accepts one challenge?
  * - (OPTIONAL) fix:       /send and /broadcasting. instead of iterating over all the clients, iterate over party members only
- * - (OPTIONAL) fix:       console. if the user is typing while a message is received, the message is not displayed correctly
+ * - (OPTIONAL) fix:       console. if the user receives a message while is typing, the typed message should be deleted
  * - (OPTIONAL) fix:       console. improve the console interface for the client
  * - (OPTIONAL) feature:   console. display the /help commands depending on the context (lobby, party, game)
  * - (OPTIONAL) feature:   sockets. if an user wants to connect with the same username, disconnect the previous user
@@ -1038,6 +1038,54 @@ static void app(void)
                         }
                      }
 
+                     else if(sscanf(buffer, "%s %s", command, other_username) == 2 && strncmp(command, "/reject_challenge", strlen("/reject_challenge")) == 0)
+                     {
+                        printf("The user %s tried to reject a challenge from %s\n", clients[i].name, other_username);
+
+                        // Check if the user exists
+                        Client* other_user = get_client_by_username(clients, clients_size, other_username);
+
+                        // If the user does not exist, display an error
+                        if(other_user == NULL)
+                        {
+                           strncpy(buffer, "User not found\n", BUF_SIZE - 1);
+                           send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                        }
+
+                        // If the user exists, try to reject the challenge
+                        else
+                        {
+                           int found = 0;
+                           for(int f = 0; f < clients[i].challengers_size; f++)
+                           {
+                              // If the user has a pending challenge from the other user, try to reject it
+                              if(clients[i].challengers[f] == other_user->id)
+                              {
+                                 found = 1;
+                                 
+                                 // Remove the challenge from the user list
+                                 memmove(clients[i].challengers + f, clients[i].challengers + f + 1, (clients[i].challengers_size - f - 1) * sizeof(int));
+                                 clients[i].challengers_size--;
+
+
+                                 // Send a message to the user
+                                 strncpy(buffer, "Challenge rejected\n", BUF_SIZE - 1);
+                                 send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, green);
+
+                                 break;
+                              }
+                           }
+
+                           // If the user does not have a pending challenge from the other user, display an error
+                           if(found == 0)
+                           {
+                              strncpy(buffer, "You don't have a pending challenge from this user\n", BUF_SIZE - 1);
+                              send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, red);
+                           }  
+                        }
+
+                     }
+
                      else if(strcmp(buffer, "/help") == 0)
                      {
                         strncpy(buffer, "Available commands\n",                                                                 BUF_SIZE - 1);
@@ -1059,6 +1107,7 @@ static void app(void)
                         strncat(buffer, "/challenge <<username>>: challenge an user\n",                                         BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/list_challenges: list all the challenges\n",                                          BUF_SIZE - strlen(buffer) - 1);
                         strncat(buffer, "/accept_challenge <<username>>: accept a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
+                        strncat(buffer, "/reject_challenge <<username>>: reject a challenge from an user\n",                    BUF_SIZE - strlen(buffer) - 1);
                         
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
