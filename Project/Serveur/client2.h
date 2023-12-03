@@ -6,13 +6,15 @@
 typedef struct
 {
    // Socket for the connection between the client and the server
-   // Also is used like an user id
    SOCKET sock;
+
+   // Client's ID
+   int id;
 
    // Id of the room where the client is
    // -1 if the client is in the lobby
    // party_id if the client is in a party
-   int room_id;
+   int party_id;
 
    // Client's name
    char name[BUF_SIZE];
