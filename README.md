@@ -16,6 +16,7 @@ The rules of Awale are as follows:
 
 
 ## Usage
+0. Download the folder `./Project`
 1. In the root folder, open a terminal and run `make`.
 2. Run `./serverfile` for the server. ( the server is also running on a VPS 165.22.66.251) there is for sure a lot of buffer overflows so don't hack me please :)
 3. Run `./clientfile 0.0.0.0 <<username>>` for each client.
