@@ -1,70 +1,26 @@
-# TP_Reseaux
-## TP_1
-### Exercise 1
-1. Compile the files using:
+# Awale Game
+This code implements the game of Awale.
 
-- *Server:* gcc socket_server.c -o socket_server
+Awale is a traditional African board game played with a wooden board and seeds. The board consists of 12 holes, with 6 holes on each side. Each hole initially contains a certain number of seeds.
 
-- *Client:* gcc socket_client.c -o socket_client
+The rules of Awale are as follows:
+1. Players take turns to pick up all the seeds from one of their holes and distribute them in a counter-clockwise direction, one seed per hole.
+2. If the last seed is dropped into an empty hole on the player's side, and the opposite hole on the opponent's side contains seeds, the player captures all the seeds in the opponent's hole and the last seed dropped.
+3. The game ends when one player has no more seeds on their side of the board.
+4. The player with the most seeds in their store (the two holes at the ends of the board) wins the game.
 
-2. Run the files using:
 
-- *Server:* ./socket_server 9999
+## Creators
+- YAGOUBI Hichem
+- VENEGAS Josue
 
-- *Client:* ./socket_client "server ip address" 9999
 
-2. 1. You can check your IP Address using:
-
-- ip a
-
-### Exercise 2
-1. Compile the file using:
-
-- *Client:* gcc socket_client.c -o socket_client
-
-2. Run the file using:
-
-- *Client:* ./socket_client 129.6.15.30 37
-
-### Exercise 3
-1. Compile the files using:
-
-- *Server:* gcc socket_server.c -o socket_server
-
-- *Client:* gcc socket_client.c -o socket_client
-
-2. Run the files using:
-
-- *Server:* ./socket_server 9999
-
-- *Client 01, 02, etc.:* ./socket_client "server ip address" 9999
-
-2. 1. You can check your IP Address using:
-
-- ip a
-
-### Exercise 4
-1. Compile the files using:
-
-- *Server:* gcc socket_server.c -lcurl -o socket_server
-
-- *Server titles only:* gcc socket_server_titles.c -lcurl -o socket_server_titles
-
-2. Run the files using:
-
-- *Server:* ./socket_server
-
-- *Server titles only:* ./socket_server_titles
-
-### Exercise 5
-1. COmpile the file using:
-
-- *Client:* gcc socket_client.c -o socket_client
-
-2. Run the files using:
-
-- *Client:* ./socket_client "port to scan" "client ip address"
-
-2. 1. You can check your IP Address using:
-
-- ip a
+## Usage
+0. Download the folder `./Project`
+1. In the root folder, open a terminal and run `make`.
+2. Run `./serverfile` for the server. 
+-  The server is also running on a VPS 165.22.66.251 there is for sure a lot of buffer overflows so don't hack me please :)
+3. Run `./clientfile 0.0.0.0 <<username>>` for each client.
+-  You can run the client in the VPS server with `./clientfile 165.22.66.251 <<username>>` for each client.
+4. In the program, you can run `/help_1` and `/help_2` to see the list of available commands.
+5. After finish, clear the executable files with `make clean`.
