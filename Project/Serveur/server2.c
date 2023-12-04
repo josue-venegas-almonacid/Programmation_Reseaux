@@ -1350,8 +1350,8 @@ static void app(void)
       }
    }
 
-   clear_clients(clients, clients_size);
-   end_connection(sock);
+   // Close the socket for the server
+   closesocket(sock);
 }
 
 int compare_ranking(const void *a, const void *b)
@@ -1456,22 +1456,6 @@ void broadcast_message(Client *clients, int clients_size, int sender_id, int par
    }
 }
 
-static void clear_clients(Client *clients, int clients_size)
-{
-   for(int i = 0; i < clients_size; i++)
-   {
-      closesocket(clients[i].sock);
-   }
-}
-
-static void remove_client(Client *clients, int to_remove, int *clients_size)
-{
-   /* we remove the client in the array */
-   memmove(clients + to_remove, clients + to_remove + 1, (*clients_size - to_remove - 1) * sizeof(Client));
-   /* number client - 1 */
-   (*clients_size)--;
-}
-
 static int init_connection(void)
 {
    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -1500,11 +1484,6 @@ static int init_connection(void)
    }
 
    return sock;
-}
-
-static void end_connection(int sock)
-{
-   closesocket(sock);
 }
 
 static int read_client(SOCKET sock, char *buffer)

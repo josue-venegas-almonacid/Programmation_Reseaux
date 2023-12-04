@@ -88,10 +88,7 @@ int getRandomValue(int val1, int val2);
 void send_message_to_client(Client *clients, int clients_size, int sender_id, int receiver_socket, char *buffer, char *color);
 void broadcast_message(Client *clients, int clients_size, int sender_id, int room_id, char *buffer, char *color);
 
-static void clear_clients(Client *clients, int clients_size);
-static void remove_client(Client *clients, int to_remove, int *clients_size);
 static int init_connection(void);
-static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
 
