@@ -17,7 +17,8 @@ The rules of Awale are as follows:
 
 ## Usage
 1. In the root folder, open a terminal and run `make`.
-2. Run `./serverfile` for the server.
+2. Run `./serverfile` for the server. ( the server is also running on a VPS 165.22.66.251) there is for sure a lot of buffer overflows so don't hack me please :)
 3. Run `./clientfile 0.0.0.0 <<username>>` for each client.
+   Run `./clientfile 165.22.66.251 <<username>>` for each client.
 4. In the program, you can run `/help_1` and `/help_2` to see the list of available commands.
 5. After finishing, clean the executable files with `make clean`.
