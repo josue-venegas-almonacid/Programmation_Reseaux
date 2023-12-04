@@ -57,7 +57,7 @@
 - *Server titles only:* ./socket_server_titles
 
 ### Exercise 5
-1. COmpile the file using:
+1. Compile the file using:
 
 - *Client:* gcc socket_client.c -o socket_client
 
