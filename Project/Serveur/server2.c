@@ -425,6 +425,11 @@ static void app(void)
                            strncat(buffer, "  - Visibility: ",                          BUF_SIZE - strlen(buffer) - 1);
                            strncpy(str, (party->mode == 0)? "Public\n":"Private\n",     BUF_SIZE - 1);
                            strncat(buffer, str,                                         BUF_SIZE - strlen(buffer) - 1);
+                           
+                           strncat(buffer, "  - Status: ",                              BUF_SIZE - strlen(buffer) - 1);
+                           strncpy(str, (party->status == 1)? "Started\n": ((party->status == 2)? "Over\n" : "Not started yet\n"),     BUF_SIZE - 1);
+                           strncat(buffer, str,                                         BUF_SIZE - strlen(buffer) - 1);
+
                         }
                         send_message_to_client(clients, clients_size, 0, clients[i].sock, buffer, yellow);
                      }
@@ -538,8 +543,40 @@ static void app(void)
 
                         else
                         {
-                           // Save the lobby id to the client room attribute
-                           clients[i].party_id = -1;
+                           // Reset the party
+                           party = get_party_by_id(parties, parties_size, clients[i].party_id);
+                           if (party->player_one->sock == clients[i].sock)
+                           {
+                              party->player_one->party_id = -1;
+                              party->status = 2;
+                              if (party->player_two != NULL) 
+                                 {
+                                 strncpy(buffer, "The party is over\n", BUF_SIZE - 1);
+                                 broadcast_message(clients, clients_size, 0, party->id, buffer, red);                       
+                                 party->player_two->party_id = -1;
+                                 }
+                           }
+                           else if (party->player_two != NULL && party->player_two->sock == clients[i].sock)
+                           {
+                              strncpy(buffer, "The party is over\n", BUF_SIZE - 1);
+                              broadcast_message(clients, clients_size, 0, party->id, buffer, red);  
+                              party->player_one->party_id = -1;
+                              party->player_two->party_id = -1;
+                              party->status = 2;
+                           }
+                           else
+                           {
+                              for (int s = 0; s < party->spectators_size; s++)
+                              {
+                                 if (party->spectators[s] == clients[i].sock)
+                                 {
+                                    memmove(party->spectators + s, party->spectators + s + 1, (party->spectators_size - s - 1) * sizeof(int));
+                                    party->spectators_size--;
+                                    break;
+                                 }
+                              }
+                           }
+
 
                            // Send a message to the user
                            strncpy(buffer, "You left the party\n", BUF_SIZE - 1);
